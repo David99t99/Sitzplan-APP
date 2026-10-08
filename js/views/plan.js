@@ -32,8 +32,10 @@ const FLACH = 0.6;   // Spalte/Zeile, in der nur Tafel oder Tür liegen
 
 export async function zeichnePlan(container) {
   const klasse = aktuelleKlasse();
-  const [plan, personen, heuteAlle] = await Promise.all([
+  // plan = wer sitzt wo (gehört der Klasse), raum = wo die Plätze sind (gilt für alle Klassen im Raum)
+  const [plan, raum, personen, heuteAlle] = await Promise.all([
     db.ladeAktuellenPlan(klasse.id),
+    db.ladeRaum(klasse.raumId),
     db.ladePersonen(klasse.id),
     db.ladeBeobachtungenKlasse(klasse.id, zeitraumGrenzen('heute').ab),
   ]);
@@ -49,20 +51,26 @@ export async function zeichnePlan(container) {
 
   // Verwaiste Zuordnungen entfernen (gelöschte Person / Platz existiert nicht mehr)
   const vorher = Object.keys(plan.zuordnung).length;
-  aufraeumen(plan, new Set(personNachId.keys()));
+  aufraeumen(plan, raum, new Set(personNachId.keys()));
   if (Object.keys(plan.zuordnung).length !== vorher) await db.speicherePlan(plan);
 
-  // ---------- Noch keine Sitzplätze? Dann nur den nächsten Schritt zeigen ----------
-  const bereich = belegterBereich(plan);
-  if (!bereich || sitzplaetze(plan).length === 0) {
+  // ---------- Noch kein Raum oder keine Sitzplätze? Dann nur den nächsten Schritt zeigen ----------
+  const bereich = raum && belegterBereich(raum);
+  if (!bereich || sitzplaetze(raum).length === 0) {
     container.append(el('div', { class: 'karte leer-hinweis' },
       el('div', { class: 'leer-symbol' }, icon('raum')),
-      el('h2', { text: 'Noch keine Sitzplätze' }),
-      el('p', { class: 'hinweis', text: 'Lege zuerst fest, wo in diesem Raum Sitzplätze, Tafel und Tür sind.' }),
+      el('h2', { text: raum ? 'Noch keine Sitzplätze' : 'Noch kein Raum' }),
+      el('p', {
+        class: 'hinweis',
+        text: raum
+          ? `Lege zuerst fest, wo in „${raum.name}“ Sitzplätze, Tafel und Tür sind.`
+          : 'Teile dieser Klasse zuerst einen Raum zu.',
+      }),
       el('button', {
         class: 'knopf primaer',
-        onclick: () => { state.ansicht = 'raum'; app.neuZeichnen(); },
-      }, 'Sitzplätze festlegen'),
+        // Mit Raum direkt in dessen Editor, sonst zur Liste der Räume
+        onclick: () => { state.ansicht = 'raum'; state.raumId = raum?.id ?? null; app.neuZeichnen(); },
+      }, raum ? 'Sitzplätze festlegen' : 'Raum wählen'),
     ));
     return;
   }
@@ -74,7 +82,7 @@ export async function zeichnePlan(container) {
   // ---------- Kopfleiste: Modus ----------
   // Zeile darunter: links Fach · Raum (Unterricht) bzw. die Anleitung (Bearbeiten),
   // rechts "Ansicht drehen". Gleiche Höhe in beiden Modi, damit das Raster nicht springt.
-  let info = [klasse.fach, klasse.raum && `Raum ${klasse.raum}`].filter(Boolean).join(' · ');
+  let info = [klasse.fach, raum.name].filter(Boolean).join(' · ');
   if (gewaehlt) info = `${namen.get(gewaehlt.id)} ist markiert – jetzt den Platz antippen.`;
   else if (bearbeiten) info = 'Person ziehen – oder antippen und dann den Platz antippen.';
   container.append(el('div', { class: 'plan-kopf' },
@@ -95,11 +103,11 @@ export async function zeichnePlan(container) {
   // Eine Tafel, die quer über einen Gang reicht, macht den Gang NICHT breiter.
   const braucht = (typen) => typen.some((t) => t === 'sitz' || t === 'pult');
   const spaltenSpuren = spalten.map((s) => {
-    const typen = zeilen.map((z) => plan.felder[feldKey(z, s)]);
+    const typen = zeilen.map((z) => raum.felder[feldKey(z, s)]);
     return braucht(typen) ? 1 : typen.includes('tuer') ? FLACH : GANG;
   });
   const zeilenSpuren = zeilen.map((z) => {
-    const typen = spalten.map((s) => plan.felder[feldKey(z, s)]);
+    const typen = spalten.map((s) => raum.felder[feldKey(z, s)]);
     return braucht(typen) ? 1 : typen.some(Boolean) ? FLACH : GANG;
   });
   const spuren = (liste) => liste.map((f) => (f === 1 ? 'var(--zelle)' : `calc(var(--zelle) * ${f})`)).join(' ');
@@ -118,12 +126,12 @@ export async function zeichnePlan(container) {
   zeilen.forEach((z, zi) => {
     for (let si = 0; si < spalten.length; si++) {
       const key = feldKey(z, spalten[si]);
-      const typ = plan.felder[key];
+      const typ = raum.felder[key];
       if (!typ) continue;
       // Tafel/Lehrertisch/Tür: gleiche Felder nebeneinander zu EINEM Block zusammenfassen
       let breite = 1;
       if (typ !== 'sitz') {
-        while (plan.felder[feldKey(z, spalten[si + breite])] === typ) breite++;
+        while (raum.felder[feldKey(z, spalten[si + breite])] === typ) breite++;
       }
       const feld = typ === 'sitz' ? sitz(key) : moebel(typ, breite);
       feld.style.gridRow = String(zi + 1);
@@ -317,7 +325,7 @@ export async function zeichnePlan(container) {
     });
     if (ergebnis !== 'ok') return;
     if (sichern.checked) await db.speichereVersion(plan, 'Vor Zufallsverteilung');
-    const uebrig = zufaelligVerteilen(plan, personen);
+    const uebrig = zufaelligVerteilen(plan, raum, personen);
     await db.speicherePlan(plan);
     state.auswahl = null;
     await app.neuZeichnen();

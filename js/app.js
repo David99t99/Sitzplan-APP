@@ -6,6 +6,7 @@ import { state, app, aktuelleKlasse } from './state.js';
 import * as db from './db.js';
 import { el, toast } from './util/ui.js';
 import { icon } from './util/icons.js';
+import { sortierbarMachen, warGeradeGezogen } from './util/ziehen.js';
 import { zeichnePlan } from './views/plan.js';
 import { zeichneRaum } from './views/raum.js';
 import { zeichneSchueler } from './views/schueler.js';
@@ -22,7 +23,7 @@ const ANSICHTEN = [
   { id: 'plan', name: 'Sitzplan', symbol: 'sitzplan', zeichne: zeichnePlan },
   { id: 'uebersicht', name: 'Übersicht', symbol: 'uebersicht', zeichne: zeichneUebersicht, breit: true },
   { id: 'schueler', name: 'SuS', symbol: 'sus', zeichne: zeichneSchueler },
-  { id: 'raum', name: 'Raum', symbol: 'raum', zeichne: zeichneRaum },
+  { id: 'raum', name: 'Räume', symbol: 'raum', zeichne: zeichneRaum },
   { id: 'klasse', name: 'Mehr', symbol: 'mehr', zeichne: zeichneKlasse },
   { id: 'person', name: 'Verlauf', zeichne: zeichnePerson, versteckt: true },
   { id: 'versionen', name: 'Versionen', zeichne: zeichneVersionen, versteckt: true },
@@ -58,8 +59,9 @@ async function neuZeichnen() {
   inhalt.replaceChildren(neu);
   inhalt.querySelectorAll('[data-scroll]').forEach((e) => { e.scrollLeft = scroll[e.dataset.scroll] || 0; });
 
-  // Andere Ansicht oder andere Klasse: wieder ganz oben beginnen
-  const seite = [state.ansicht, state.klasseId, state.ansicht === 'person' ? state.personId : ''].join('|');
+  // Andere Ansicht, andere Klasse oder anderer Raum: wieder ganz oben beginnen
+  const seite = [state.ansicht, state.klasseId, state.ansicht === 'person' ? state.personId : '',
+    state.ansicht === 'raum' ? state.raumId : ''].join('|');
   if (seite !== letzteSeite) inhalt.scrollTop = 0;
   letzteSeite = seite;
 }
@@ -79,18 +81,33 @@ async function ladeAppVersion() {
   document.querySelector('#kopf .version')?.replaceChildren(appVersion);
 }
 
-// Oben: ein Tab pro Klasse + "+" für eine neue Klasse
+// Oben: ein Tab pro Klasse + "+" für eine neue Klasse.
+// Die Tabs lassen sich durch Ziehen umsortieren (am Handy: gedrückt halten, dann ziehen).
 function zeichneKopf() {
+  const kopf = document.getElementById('kopf');
+  // Wird gerade ein Tab verschoben, bleibt die Leiste stehen (sonst risse sie ihn dem Finger weg)
+  if (kopf.querySelector('.wird-verschoben')) return;
+
   const tabs = state.klassen.map((k) => el('button', {
     class: 'tab' + (k.id === state.klasseId ? ' aktiv' : ''),
     text: k.name,
-    onclick: () => klasseWechseln(k.id),
+    dataset: { id: k.id },
+    onclick: () => { if (!warGeradeGezogen()) klasseWechseln(k.id); },
   }));
   tabs.push(el('button', { class: 'tab plus', 'aria-label': 'Neue Klasse', title: 'Neue Klasse', onclick: neueKlasseDialog }, icon('plus')));
 
-  const kopf = document.getElementById('kopf');
+  const leiste = el('div', { class: 'tabs' }, tabs);
+  sortierbarMachen(leiste, '.tab:not(.plus)', (neu) => {
+    // Die Leiste steht schon richtig. state.klassen sofort nachziehen (falls gleich
+    // darauf neu gezeichnet wird), dann speichern.
+    const ids = neu.map((tab) => tab.dataset.id);
+    for (const k of state.klassen) k.sortierung = ids.indexOf(k.id) + 1;
+    state.klassen.sort((a, b) => a.sortierung - b.sortierung);
+    return db.sortiereKlassen(ids);
+  });
+
   kopf.replaceChildren(el('div', { class: 'kopf-zeile' },
-    el('div', { class: 'tabs' }, tabs),
+    leiste,
     el('span', { class: 'version', title: 'Version der App', text: appVersion }),
   ));
 
@@ -119,13 +136,14 @@ function zeichneNavi() {
   navi.replaceChildren(...ANSICHTEN.filter((a) => !a.versteckt).map((a) => el('button', {
     class: 'navi-knopf' + (aktiv === a.id ? ' aktiv' : ''),
     'aria-current': aktiv === a.id ? 'page' : null,
-    onclick: () => { state.ansicht = a.id; state.auswahl = null; neuZeichnen(); },
+    onclick: () => { state.ansicht = a.id; state.auswahl = null; state.raumId = null; neuZeichnen(); },
   }, el('span', { class: 'navi-symbol' }, icon(a.symbol)), el('span', { text: a.name }))));
 }
 
 async function klasseWechseln(id) {
   state.klasseId = id;
   state.auswahl = null;
+  state.raumId = null; // in "Räume" zurück zur Liste: dort steht der Raum der neuen Klasse
   if (state.ansicht === 'person') state.ansicht = state.zurueck; // Verlauf gehört zur alten Klasse
   state.versionId = null;
   await db.speichereEinstellung('letzteKlasse', id);
@@ -139,7 +157,7 @@ function zeichneWillkommen(container) {
     el('h2', { text: 'Willkommen!' }),
     el('p', { class: 'hinweis', text: 'In drei Schritten zu deinem ersten Sitzplan:' }),
     el('ol', { class: 'schritte' },
-      el('li', { text: 'Klasse anlegen' }),
+      el('li', { text: 'Klasse und Raum anlegen' }),
       el('li', { text: 'Sitzplätze im Raum festlegen' }),
       el('li', { text: 'SuS eintragen und auf die Plätze setzen' }),
     ),

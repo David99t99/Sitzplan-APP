@@ -171,11 +171,24 @@ h3 {
   font-weight: 600;
   white-space: nowrap;
   transition: background .15s, color .15s;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;   /* kein iOS-Menü beim Gedrückthalten (Tab verschieben) */
 }
 .tab.aktiv {
   background: var(--akzent-fuellung);
   color: var(--akzent-text);
   box-shadow: 0 2px 6px color-mix(in srgb, var(--akzent-fuellung) 40%, transparent);
+}
+/* Tab wird gerade verschoben (js/util/ziehen.js): hebt sich ab und liegt über den Nachbarn */
+.tab.wird-verschoben {
+  position: relative;
+  z-index: 1;
+  cursor: grabbing;
+  opacity: .92;
+  outline: 2px solid var(--akzent);
+  outline-offset: 1px;
+  box-shadow: var(--schatten-gross);
 }
 .tab.plus {
   width: 44px;

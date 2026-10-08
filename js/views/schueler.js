@@ -10,9 +10,10 @@ import { fotoVerkleinern } from '../util/foto.js';
 
 export async function zeichneSchueler(container) {
   const klasse = aktuelleKlasse();
-  const [personen, plan] = await Promise.all([
+  const [personen, plan, raum] = await Promise.all([
     db.ladePersonen(klasse.id),
     db.ladeAktuellenPlan(klasse.id),
+    db.ladeRaum(klasse.raumId),
   ]);
 
   if (personen.length === 0) {
@@ -34,10 +35,12 @@ export async function zeichneSchueler(container) {
   // Nächster Schritt, solange nicht alle einen Platz haben
   const besetzt = new Set(Object.values(plan.zuordnung));
   const ohnePlatz = personen.filter((p) => !besetzt.has(p.id)).length;
-  const hatPlaetze = sitzplaetze(plan).length > 0;
+  const hatPlaetze = !!raum && sitzplaetze(raum).length > 0;
   if (!hatPlaetze) {
-    container.append(tipp('Im Raum sind noch keine Sitzplätze festgelegt.', 'Zum Raum',
-      () => { state.ansicht = 'raum'; app.neuZeichnen(); }));
+    container.append(tipp(
+      raum ? `In „${raum.name}“ sind noch keine Sitzplätze festgelegt.` : 'Diese Klasse hat noch keinen Raum.',
+      raum ? 'Zum Raum' : 'Raum wählen',
+      () => { state.ansicht = 'raum'; state.raumId = raum?.id ?? null; app.neuZeichnen(); }));
   } else if (ohnePlatz > 0) {
     container.append(tipp(
       ohnePlatz === personen.length ? 'Noch niemand hat einen Platz.' : `${ohnePlatz} SuS haben noch keinen Platz.`,

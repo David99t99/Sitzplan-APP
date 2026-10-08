@@ -5,11 +5,12 @@
 export const state = {
   klassen: [],          // alle Klassen (aus der Datenbank geladen)
   klasseId: null,       // die gerade geöffnete Klasse
-  ansicht: 'plan',      // 'plan' | 'schueler' | 'raum' | 'klasse'
+  ansicht: 'plan',      // 'plan' | 'uebersicht' | 'schueler' | 'raum' | 'klasse' | 'person' | 'versionen'
   modus: 'unterricht',  // 'unterricht' (gesperrt) | 'bearbeiten'
   lehrersicht: true,    // true = Tafel unten (Blick vom Lehrertisch)
   auswahl: null,        // im Bearbeitungsmodus angetippte Person (id)
   werkzeug: 'sitz',     // im Raum-Editor gewähltes Werkzeug
+  raumId: null,         // in "Räume" geöffneter Raum (null = Liste aller Räume)
 
   // Ab Phase 2: Beobachtungen
   personId: null,       // Person in der Verlaufsansicht

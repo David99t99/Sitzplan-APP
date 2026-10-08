@@ -3,6 +3,9 @@
 // Jedes Feld hat einen Schlüssel "zeile-spalte", z. B. "0-3".
 // Gespeichert wird immer aus SCHÜLERSICHT: Zeile 0 = vorne (bei der Tafel).
 // Die Lehrersicht dreht nur die Anzeige um 180°.
+//
+// "raum" = der Raum mit seinem Raster (raum.felder), "plan" = der Sitzplan
+// einer Klasse (plan.zuordnung: wer sitzt auf welchem Feld).
 
 export const feldKey = (zeile, spalte) => `${zeile}-${spalte}`;
 export const ausKey = (key) => key.split('-').map(Number);
@@ -25,8 +28,9 @@ export function anzeigeReihenfolge(von, bis, lehrersicht) {
 
 // Kleinstes Rechteck, das alle markierten Felder enthält.
 // Damit zeigt der Sitzplan keine leeren Ränder an.
-export function belegterBereich(plan) {
-  const keys = Object.keys(plan.felder);
+// (Geht auch mit einer gespeicherten Version – die hat ihr Raster in version.felder.)
+export function belegterBereich(raum) {
+  const keys = Object.keys(raum.felder);
   if (keys.length === 0) return null;
   let zMin = Infinity, zMax = -Infinity, sMin = Infinity, sMax = -Infinity;
   for (const key of keys) {
@@ -38,13 +42,19 @@ export function belegterBereich(plan) {
 }
 
 // Alle Sitzplatz-Schlüssel, sortiert von vorne links nach hinten rechts
-export function sitzplaetze(plan) {
-  return Object.keys(plan.felder)
-    .filter((k) => plan.felder[k] === 'sitz')
+export function sitzplaetze(raum) {
+  return Object.keys(raum.felder)
+    .filter((k) => raum.felder[k] === 'sitz')
     .sort((a, b) => {
       const [za, sa] = ausKey(a), [zb, sb] = ausKey(b);
       return za - zb || sa - sb;
     });
+}
+
+// Die Schlüssel einer Zuordnung, an denen der Raum keinen Sitzplatz hat
+// (raum = null: Klasse ohne Raum, also alle).
+export function ohneSitzplatz(zuordnung, raum) {
+  return Object.keys(zuordnung).filter((key) => raum?.felder[key] !== 'sitz');
 }
 
 // Auf welchem Platz sitzt eine Person? (Schlüssel oder null)
@@ -70,9 +80,9 @@ export function freigeben(plan, personId) {
 
 // Entfernt Zuordnungen, deren Platz kein Sitzplatz mehr ist
 // oder deren Person nicht mehr existiert.
-export function aufraeumen(plan, personenIds) {
+export function aufraeumen(plan, raum, personenIds) {
   for (const key of Object.keys(plan.zuordnung)) {
-    if (plan.felder[key] !== 'sitz' || (personenIds && !personenIds.has(plan.zuordnung[key]))) {
+    if (raum?.felder[key] !== 'sitz' || (personenIds && !personenIds.has(plan.zuordnung[key]))) {
       delete plan.zuordnung[key];
     }
   }
@@ -80,13 +90,13 @@ export function aufraeumen(plan, personenIds) {
 
 // Zufallsverteilung: mischt die Personen (Fisher-Yates) und setzt sie der Reihe nach.
 // Gibt die Anzahl der Personen zurück, die keinen Platz bekommen haben.
-export function zufaelligVerteilen(plan, personen) {
+export function zufaelligVerteilen(plan, raum, personen) {
   const gemischt = personen.map((p) => p.id);
   for (let i = gemischt.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [gemischt[i], gemischt[j]] = [gemischt[j], gemischt[i]];
   }
-  const plaetze = sitzplaetze(plan);
+  const plaetze = sitzplaetze(raum);
   plan.zuordnung = {};
   plaetze.forEach((key, i) => { if (i < gemischt.length) plan.zuordnung[key] = gemischt[i]; });
   return Math.max(0, gemischt.length - plaetze.length);

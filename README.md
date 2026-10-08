@@ -8,6 +8,7 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
 - Phase 2: Beobachtungen. Im Unterrichtsmodus öffnet Antippen einer Person das Schnellmenü (Mitarbeit +/−, Verhalten +/−, Schnellbuttons, Notiz) mit „Rückgängig“. Am Platz stehen die Zähler von heute. Dazu kommen der Verlauf pro Person (Filter, Summen, bearbeiten, löschen, nachtragen), die Klassenübersicht (sortierbar) und konfigurierbare Schnellbuttons.
 - Phase 3: Backup als Datei (inkl. Fotos) und Import, CSV-Export (Übersicht und alle Einträge), Backup-Erinnerung, Versionen der Sitzordnung (speichern, ansehen, wiederherstellen), Raumvorlagen, PIN-Sperre, Reihenfolge der Klassen-Tabs.
 - v6: Oberfläche überarbeitet. Der Sitzplan passt am Handy ganz auf den Bildschirm (Gänge werden schmal gezeichnet, Tafel und Lehrertisch als beschriftete Blöcke), im Bearbeitungsmodus bleibt die Leiste „Ohne Platz“ unten stehen, einheitliche Symbole, eigene Sicherheitsfragen statt Browser-Fenstern, Hinweise auf den jeweils nächsten Schritt.
+- v7: Räume sind eigenständig (siehe „Räume“ unten) und ersetzen die Raumvorlagen. Die Klassen-Tabs oben lassen sich durch Ziehen umsortieren (am Handy: Tab gedrückt halten, dann ziehen).
 
 ## Projektstruktur
 
@@ -21,7 +22,7 @@ js/app.js               Start, Klassen-Tabs, Navigation, neu zeichnen
 js/state.js             Zustand der Oberfläche (gewählte Klasse, Modus …)
 js/db.js                Datenmodell + alle Datenbankzugriffe
 js/util/raster.js       Rechnen mit dem Raster (Plätze, Tauschen, Zufall)
-js/util/ziehen.js       Drag & Drop mit dem Finger
+js/util/ziehen.js       Drag & Drop mit dem Finger (SuS setzen, Klassen-Tabs umsortieren)
 js/util/foto.js         Fotos verkleinern (400 × 400 px, JPEG)
 js/util/ui.js           Helfer: Elemente bauen, Dialoge, Sicherheitsfragen, Meldungen, Avatare
 js/util/icons.js        Symbole als SVG (überall gleich, statt Emojis)
@@ -29,7 +30,7 @@ js/util/beobachtung.js  Kategorien, Zeiträume (Heute … Schuljahr), Summen, Da
 js/util/datei.js        Datei speichern (Laptop: Download, iPhone: Teilen) und Datei wählen
 js/util/sicherung.js    Backup (JSON), Prüfen beim Import, CSV, Backup-Erinnerung
 js/views/plan.js        Ansicht "Sitzplan"
-js/views/raum.js        Ansicht "Raum" (Raster-Editor)
+js/views/raum.js        Ansicht "Räume" (Liste aller Räume, Raster-Editor, Raum zuteilen)
 js/views/schueler.js    Ansicht "SuS"
 js/views/klasse.js      Ansicht "Mehr": Klasse, Datensicherung, PIN, Schnellbuttons + Dialog "Neue Klasse"
 js/views/schnellmenue.js  Schnellmenü im Unterrichtsmodus
@@ -91,6 +92,23 @@ Anklicken, Escape schließt Fenster.
 **Wichtig:** Laptop und iPhone haben **getrennte Daten**, weil alles lokal gespeichert wird
 und es absichtlich keine Cloud gibt. Übertragen geht mit einer Backup-Datei (siehe unten).
 
+## Räume
+
+Ein Raum (z. B. „EDV Nord“) wird **einmal** unter „Räume“ gezeichnet und gehört zu keiner Klasse.
+Jeder Klasse teilst du einen Raum zu: unter „Räume“ → „Diese Klasse sitzt in“, oder gleich beim Anlegen der Klasse.
+
+- Änderst du einen Raum, gilt das sofort für **alle** Klassen, die darin sitzen. Fällt dabei ein besetzter
+  Platz weg, kommt die Person in „Ohne Platz“ (bei einem einzelnen Feld mit „Rückgängig“).
+- Die Sitzordnung (wer wo sitzt) gehört weiterhin der Klasse.
+- „Kopie anlegen“ macht aus einem Raum einen zweiten, eigenen Raum, z. B. für „EDV Süd“ mit fast gleicher Einrichtung.
+- Wechselt eine Klasse den Raum, behalten die SuS ihren Platz, wenn es ihn im neuen Raum auch gibt. Sonst wird
+  die bisherige Sitzordnung vorher automatisch als Version gespeichert.
+- Ein Raum lässt sich erst löschen, wenn keine Klasse mehr darin sitzt.
+
+Beim Update von v6 werden die Daten automatisch umgestellt: Klassen mit demselben Raster kommen in denselben Raum
+(außer es waren verschiedene Raumnamen eingetragen), aus jeder Raumvorlage wird ein Raum. Namen und Zuteilung
+lassen sich danach unter „Räume“ anpassen.
+
 ## Datensicherung und Übertragung
 
 - **Backup erstellen:** „Mehr“ → „Backup erstellen“.
@@ -102,6 +120,8 @@ und es absichtlich keine Cloud gibt. Übertragen geht mit einer Backup-Datei (si
   Browser, Mail an dich selbst, USB-Kabel) und dort einspielen. Umgekehrt genauso.
   Am besten immer nur auf **einem** Gerät eintragen und dann übertragen, sonst überschreibt der Import
   die Einträge des anderen Geräts.
+- Backups aus älteren App-Versionen lassen sich weiterhin einspielen. Umgekehrt nicht: Ein Backup aus v7 braucht
+  auf dem anderen Gerät ebenfalls mindestens v7 (sonst erscheint „Bitte zuerst die App aktualisieren“).
 - Die PIN und die Erinnerungs-Einstellungen bleiben auf dem jeweiligen Gerät, sie sind nicht im Backup.
 - Die Backup-Datei enthält Schülerdaten und Fotos: nicht weitergeben, nicht unverschlüsselt in fremde Clouds legen.
 - **CSV für Excel:** „Übersicht“ → „Übersicht als CSV“ (Summen pro Person im gewählten Zeitraum) oder
@@ -116,7 +136,7 @@ auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v6';` erhöhen (v7, v8 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v7';` erhöhen (v8, v9 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.

@@ -1,4 +1,4 @@
-// klasse.js – die Seite "Mehr": Angaben zur Klasse (Name, Fach, Raum, Schuljahr, Reihenfolge),
+// klasse.js – die Seite "Mehr": Angaben zur Klasse (Name, Fach, Schuljahr, Raum, Reihenfolge),
 // Datensicherung, PIN-Sperre, Schnellbuttons, Klasse löschen, Speicher-Info.
 // Außerdem der Dialog "Neue Klasse".
 
@@ -14,6 +14,7 @@ import { pinKarte } from './sperre.js';
 // Die Ansicht "Mehr" in der unteren Navigation
 export async function zeichneKlasse(container) {
   const klasse = aktuelleKlasse();
+  const raum = await db.ladeRaum(klasse.raumId);
   const f = klassenFelder(klasse);
 
   const formular = el('form', {
@@ -29,9 +30,17 @@ export async function zeichneKlasse(container) {
     kartenKopf('klasse', 'Angaben zur Klasse'),
     f.elemente,
     el('button', { class: 'knopf primaer', type: 'submit', text: 'Speichern' }),
+    // Der Raum wird unter "Räume" zugeteilt (dort stehen alle Räume)
+    el('div', { class: 'leiste' },
+      el('span', { class: 'hinweis wachsen', text: raum ? `Raum: ${raum.name}` : 'Noch kein Raum zugeteilt' }),
+      el('button', {
+        type: 'button', class: 'knopf klein',
+        onclick: () => { state.ansicht = 'raum'; state.raumId = null; app.neuZeichnen(); },
+      }, 'Raum ändern', icon('rechts')),
+    ),
     // Reihenfolge der Tabs oben
     state.klassen.length > 1 ? el('div', { class: 'leiste' },
-      el('span', { class: 'hinweis wachsen', text: 'Position in der Leiste oben' }),
+      el('span', { class: 'hinweis wachsen', text: 'Position in der Leiste oben (oder den Tab oben gedrückt halten und ziehen)' }),
       el('button', { type: 'button', class: 'knopf rund', 'aria-label': 'nach links', onclick: () => verschieben(-1) }, icon('links')),
       el('button', { type: 'button', class: 'knopf rund', 'aria-label': 'nach rechts', onclick: () => verschieben(1) }, icon('rechts')),
     ) : null,
@@ -185,51 +194,65 @@ async function schnellbuttonsKarte() {
   );
 }
 
-// Dialog "Neue Klasse" – danach geht es zum Raumraster (oder mit Vorlage direkt zu den SuS)
+// Dialog "Neue Klasse". Die Klasse kommt in einen vorhandenen Raum (dann geht es
+// gleich zu den SuS) oder bekommt einen neuen (dann zuerst die Sitzplätze antippen).
 export async function neueKlasseDialog() {
   const f = klassenFelder({ schuljahr: aktuellesSchuljahr() });
-  const vorlagen = await db.ladeVorlagen();
-  const vorlageWahl = el('select', {},
-    el('option', { value: '', text: '– leeres Raster –' }),
-    vorlagen.map((v) => el('option', { value: v.id, text: v.name })));
+  const raeume = await db.ladeRaeume();
+
+  const neuerName = el('input', { maxlength: 40, placeholder: 'z. B. Raum 12 oder EDV Nord' });
+  const neuerRaum = feld(raeume.length ? 'Name des neuen Raums' : 'Raum', neuerName);
+  const wahl = el('select', { required: true, onchange: zeigeNeuenRaum },
+    el('option', { value: '', text: '– Raum wählen –' }),
+    raeume.map((r) => el('option', { value: r.id, text: r.name })),
+    el('option', { value: 'neu', text: '+ Neuer Raum' }));
+  if (raeume.length === 0) wahl.value = 'neu'; // noch kein Raum: nur nach dem Namen fragen
+  // Das Namensfeld gibt es nur bei "Neuer Raum" (ausgeblendet darf es kein Pflichtfeld sein)
+  function zeigeNeuenRaum() {
+    neuerRaum.hidden = wahl.value !== 'neu';
+    neuerName.required = wahl.value === 'neu';
+  }
+  zeigeNeuenRaum();
 
   const ergebnis = await zeigeDialog({
     titel: 'Neue Klasse',
-    inhalt: [...f.elemente, vorlagen.length ? feld('Raumvorlage (optional)', vorlageWahl) : null],
+    inhalt: [...f.elemente, raeume.length ? feld('Raum', wahl) : null, neuerRaum],
     knoepfe: [{ text: 'Abbrechen' }, { text: 'Anlegen', wert: 'ok', primaer: true }],
   });
   if (ergebnis !== 'ok') return;
 
-  const vorlage = vorlagen.find((v) => v.id === vorlageWahl.value) || null;
-  const klasse = await db.legeKlasseAn(f.werte(), vorlage);
+  const werte = f.werte();
+  const neu = wahl.value === 'neu';
+  const raum = neu
+    ? await db.legeRaumAn({ name: neuerName.value.trim() || `Raum ${werte.name}` })
+    : raeume.find((r) => r.id === wahl.value);
+  const klasse = await db.legeKlasseAn({ ...werte, raumId: raum.id });
   state.klassen = await db.ladeKlassen();
   state.klasseId = klasse.id;
-  state.ansicht = vorlage ? 'schueler' : 'raum';
+  state.ansicht = neu ? 'raum' : 'schueler';
+  state.raumId = neu ? raum.id : null; // neuer Raum: gleich in dessen Editor
   state.auswahl = null;
   await db.speichereEinstellung('letzteKlasse', klasse.id);
   await app.neuZeichnen();
-  toast(vorlage ? 'Klasse angelegt. Trage jetzt die SuS ein.' : 'Klasse angelegt. Tippe jetzt die Sitzplätze an.', { dauer: 3500 });
+  toast(neu ? 'Klasse angelegt. Tippe jetzt die Sitzplätze an.' : 'Klasse angelegt. Trage jetzt die SuS ein.', { dauer: 3500 });
 }
 
 // Die Eingabefelder einer Klasse (für Dialog und Ansicht)
 function klassenFelder(k) {
   const name = el('input', { required: true, maxlength: 30, value: k.name || '', placeholder: 'z. B. 1a GWB' });
   const fach = el('input', { value: k.fach || '', placeholder: 'z. B. Informatik' });
-  const raum = el('input', { value: k.raum || '', placeholder: 'z. B. 12 oder EDV-Saal' });
   const schuljahr = el('input', { value: k.schuljahr || '', placeholder: 'z. B. 2026/27' });
   return {
     elemente: [
       feld('Name', name),
-      feld('Fach (optional)', fach),
       el('div', { class: 'feld-reihe' },
-        feld('Raum (optional)', raum),
+        feld('Fach (optional)', fach),
         feld('Schuljahr (optional)', schuljahr),
       ),
     ],
     werte: () => ({
       name: name.value.trim(),
       fach: fach.value.trim(),
-      raum: raum.value.trim(),
       schuljahr: schuljahr.value.trim(),
     }),
   };

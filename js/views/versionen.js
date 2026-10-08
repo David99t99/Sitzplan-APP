@@ -4,14 +4,15 @@ import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
 import { el, toast, zeigeDialog, bestaetigen, feld, kurznamen } from '../util/ui.js';
 import { icon } from '../util/icons.js';
-import { feldKey, belegterBereich, anzeigeReihenfolge } from '../util/raster.js';
+import { feldKey, belegterBereich, anzeigeReihenfolge, ohneSitzplatz } from '../util/raster.js';
 import { datumText } from '../util/beobachtung.js';
 
 export async function zeichneVersionen(container) {
   const klasse = aktuelleKlasse();
-  const [versionen, personen] = await Promise.all([
+  const [versionen, personen, raum] = await Promise.all([
     db.ladeVersionen(klasse.id),
     db.ladePersonen(klasse.id),
+    db.ladeRaum(klasse.raumId),
   ]);
   const personNachId = new Map(personen.map((p) => [p.id, p]));
   const namen = kurznamen(personen);
@@ -61,9 +62,12 @@ export async function zeichneVersionen(container) {
           el('button', {
             class: 'knopf primaer', text: 'Wiederherstellen',
             onclick: async () => {
+              // Das Raster gehört dem Raum: Plätze von damals, die es heute nicht gibt, bleiben leer
+              const fehlen = ohneSitzplatz(v.zuordnung, raum).filter((key) => personNachId.has(v.zuordnung[key])).length;
               if (!await bestaetigen({
                 titel: 'Sitzordnung wiederherstellen?',
-                text: 'Die aktuelle Sitzordnung wird vorher automatisch als Version gespeichert.',
+                text: 'Die aktuelle Sitzordnung wird vorher automatisch als Version gespeichert.'
+                  + (fehlen ? `\nIm heutigen Raum gibt es nicht alle Plätze von damals. Ohne Platz: ${fehlen} SuS.` : ''),
                 knopf: 'Wiederherstellen',
               })) return;
               await db.stelleVersionWiederHer(v);
@@ -108,7 +112,8 @@ export async function versionSpeichernDialog() {
   return true;
 }
 
-// Kleine, nicht bedienbare Ansicht einer Version (nur Namen)
+// Kleine, nicht bedienbare Ansicht einer Version (nur Namen).
+// Eine Version hat ihr eigenes Raster: so, wie der Raum beim Speichern war.
 function vorschau(plan, personNachId, namen) {
   const bereich = belegterBereich(plan);
   if (!bereich) return el('p', { class: 'hinweis', text: 'Leeres Raster.' });
