@@ -11,7 +11,7 @@
 
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
-import { el, toast, avatar, kurznamen } from '../util/ui.js';
+import { el, toast, avatar, kurznamen, zeigeDialog } from '../util/ui.js';
 import {
   FELDTYPEN, feldKey, belegterBereich, anzeigeReihenfolge,
   platzieren, freigeben, aufraeumen, zufaelligVerteilen,
@@ -19,6 +19,7 @@ import {
 import { ziehbarMachen, warGeradeGezogen } from '../util/ziehen.js';
 import { zeitraumGrenzen } from '../util/beobachtung.js';
 import { oeffneSchnellmenue } from './schnellmenue.js';
+import { versionSpeichernDialog } from './versionen.js';
 
 const LUECKE = 4; // Abstand zwischen den Feldern in px (muss zu --luecke in app.css passen)
 
@@ -96,6 +97,11 @@ export async function zeichnePlan(container) {
       }),
       el('div', { class: 'leiste' },
         el('button', { class: 'knopf', text: '🎲 Zufällig verteilen', onclick: zufall }),
+        el('button', { class: 'knopf', text: '💾 Version speichern', onclick: versionSpeichernDialog }),
+        el('button', {
+          class: 'knopf', text: '🕘 Versionen',
+          onclick: () => { state.ansicht = 'versionen'; state.auswahl = null; app.neuZeichnen(); },
+        }),
       ),
       leisteOhnePlatz(),
     );
@@ -218,7 +224,18 @@ export async function zeichnePlan(container) {
   }
 
   async function zufall() {
-    if (!confirm('Alle SuS zufällig neu verteilen? Die aktuelle Sitzordnung wird überschrieben.')) return;
+    // Vorher fragen – und anbieten, die bisherige Sitzordnung als Version zu sichern
+    const sichern = el('input', { type: 'checkbox', checked: Object.keys(plan.zuordnung).length > 0 });
+    const ergebnis = await zeigeDialog({
+      titel: 'Zufällig verteilen',
+      inhalt: [
+        el('p', { text: 'Alle SuS werden zufällig neu auf die Sitzplätze verteilt.' }),
+        el('label', { class: 'haken' }, sichern, el('span', { text: 'Bisherige Sitzordnung vorher als Version speichern' })),
+      ],
+      knoepfe: [{ text: 'Abbrechen' }, { text: 'Verteilen', wert: 'ok', primaer: true }],
+    });
+    if (ergebnis !== 'ok') return;
+    if (sichern.checked) await db.speichereVersion(plan, 'Vor Zufallsverteilung');
     const uebrig = zufaelligVerteilen(plan, personen);
     await db.speicherePlan(plan);
     state.auswahl = null;

@@ -5,7 +5,7 @@
 //
 // WICHTIG: Nach jeder Code-Änderung VERSION erhöhen (z. B. v2, v3 …).
 // Sonst lädt das Handy weiterhin die alte, gecachte Version.
-const VERSION = 'sitzplan-v4';
+const VERSION = 'sitzplan-v5';
 
 // Alle Dateien, die offline verfügbar sein müssen.
 // Neue Datei angelegt? -> hier eintragen!
@@ -23,6 +23,8 @@ const DATEIEN = [
   './js/util/foto.js',
   './js/util/ziehen.js',
   './js/util/beobachtung.js',
+  './js/util/datei.js',
+  './js/util/sicherung.js',
   './js/views/plan.js',
   './js/views/raum.js',
   './js/views/schueler.js',
@@ -30,6 +32,8 @@ const DATEIEN = [
   './js/views/schnellmenue.js',
   './js/views/person.js',
   './js/views/uebersicht.js',
+  './js/views/versionen.js',
+  './js/views/sperre.js',
   './icons/apple-touch-icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
