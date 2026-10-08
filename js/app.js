@@ -54,6 +54,20 @@ async function neuZeichnen() {
 }
 app.neuZeichnen = neuZeichnen;
 
+// Welche Version läuft gerade? Der Service Worker legt den Cache unter dem Namen
+// VERSION aus sw.js an (z. B. "sitzplan-v3") – daraus lesen wir "v3" ab.
+// So gibt es nur EINE Stelle, an der die Version steht: sw.js.
+let appVersion = '';
+async function ladeAppVersion() {
+  if (!('caches' in window)) return;
+  const namen = await caches.keys();
+  const treffer = namen.map((n) => /^sitzplan-(v\d+)$/.exec(n)).filter(Boolean).map((t) => t[1]);
+  // Falls kurz zwei Caches existieren (während eines Updates): die höchste Nummer
+  treffer.sort((a, b) => Number(b.slice(1)) - Number(a.slice(1)));
+  appVersion = treffer[0] || '';
+  document.querySelector('#kopf .version')?.replaceChildren(appVersion);
+}
+
 // Oben: ein Tab pro Klasse + "+" für eine neue Klasse
 function zeichneKopf() {
   const tabs = state.klassen.map((k) => el('button', {
@@ -64,7 +78,10 @@ function zeichneKopf() {
   tabs.push(el('button', { class: 'tab plus', 'aria-label': 'Neue Klasse', text: '+', onclick: neueKlasseDialog }));
 
   const kopf = document.getElementById('kopf');
-  kopf.replaceChildren(el('div', { class: 'tabs' }, tabs));
+  kopf.replaceChildren(
+    el('div', { class: 'tabs' }, tabs),
+    el('span', { class: 'version', title: 'Version der App', text: appVersion }),
+  );
   // Aktiven Tab sichtbar machen, falls die Leiste gescrollt ist
   kopf.querySelector('.tab.aktiv')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }
@@ -126,6 +143,9 @@ async function start() {
 if ('serviceWorker' in navigator) {
   const hatteSchonEinen = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Service Worker:', e));
+  // Versionsanzeige oben rechts füllen (beim allerersten Start erst, wenn der Cache angelegt ist)
+  ladeAppVersion();
+  navigator.serviceWorker.ready.then(ladeAppVersion);
   // Neue Version wurde installiert -> einmal neu laden, damit sie sofort gilt
   let neuGeladen = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {

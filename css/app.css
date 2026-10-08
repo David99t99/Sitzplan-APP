@@ -75,11 +75,22 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600
 
 /* ------------------------------------------------------------ Kopf: Tabs */
 #kopf {
+  display: flex;
+  align-items: center;
   background: var(--flaeche);
   border-bottom: 1px solid var(--rand);
   padding-top: env(safe-area-inset-top);
 }
+/* Versionsanzeige rechts oben (z. B. "v3") */
+.version {
+  flex: none;
+  padding: 0 12px 0 4px;
+  font-size: .75rem;
+  color: var(--leise);
+}
 .tabs {
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 8px;
   padding: 8px 12px;
