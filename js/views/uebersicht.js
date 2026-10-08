@@ -5,7 +5,8 @@
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
 import { el, avatar } from '../util/ui.js';
-import { zeitraumGrenzen, summen, summeText } from '../util/beobachtung.js';
+import { zeitraumGrenzen, summen, summeText, ZEITRAEUME } from '../util/beobachtung.js';
+import { csvEintraege, csvUebersicht } from '../util/sicherung.js';
 import { filterLeiste } from './person.js';
 
 export async function zeichneUebersicht(container) {
@@ -108,7 +109,32 @@ export async function zeichneUebersicht(container) {
     el('div', { class: 'tabelle-huelle', dataset: { scroll: 'uebersicht' } },
       el('table', { class: 'tabelle' }, thead, tbody)),
     el('p', { class: 'hinweis', text: 'Spaltenkopf antippen = sortieren · Zeile antippen = Verlauf' }),
+    el('div', { class: 'leiste' },
+      el('button', {
+        class: 'knopf klein', text: '⬇︎ Übersicht als CSV',
+        onclick: () => csvUebersicht(klasse,
+          ['Nachname', 'Vorname', 'Mitarbeit +', 'Mitarbeit −', 'Mitarbeit Summe',
+            'Verhalten +', 'Verhalten −', 'Verhalten Summe', ...buttons.map((sb) => sb.name), 'Notizen',
+            'Zeitraum'],
+          zeilen.map(({ person, w }) => [person.nachname, person.vorname,
+            w['mitarbeit-plus'], w['mitarbeit-minus'], w['mitarbeit-summe'],
+            w['verhalten-plus'], w['verhalten-minus'], w['verhalten-summe'],
+            ...buttons.map((sb) => w['sb-' + sb.id]), w.notiz, zeitraumName()])),
+      }),
+      el('button', {
+        class: 'knopf klein', text: '⬇︎ Alle Einträge als CSV',
+        onclick: () => csvEintraege(klasse, beobachtungen, personen, alleButtons),
+      }),
+    ),
   );
+}
+
+// "Dieses Semester" bzw. "01.10.2026 – 08.10.2026" für die CSV-Datei
+function zeitraumName() {
+  const f = state.filter;
+  if (f.zeitraum !== 'eigen') return ZEITRAEUME.find((z) => z.id === f.zeitraum)?.name || '';
+  const de = (t) => (t ? t.split('-').reverse().join('.') : '…');
+  return `${de(f.von)} – ${de(f.bis)}`;
 }
 
 function oeffnePerson(id) {

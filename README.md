@@ -3,9 +3,10 @@
 Sitzordnungen pro Klasse anlegen und im Unterricht nutzen.
 Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud, kein Tracking.
 
-**Stand: Phase 2**
+**Stand: Phase 3 (alle geplanten Funktionen)**
 - Phase 1: Klassen, Raumraster, SuS (mit Foto und Namensliste), Zuweisen per Ziehen oder Antippen, Zufallsverteilung, Unterrichts-/Bearbeitungsmodus, offline-fähig.
-- Phase 2: Beobachtungen. Im Unterrichtsmodus öffnet Antippen einer Person das Schnellmenü (Mitarbeit +/−, Verhalten +/−, Schnellbuttons, Notiz) mit „Rückgängig“. Am Platz stehen die Zähler von heute. Dazu kommen der Verlauf pro Person (Filter, Summen, bearbeiten, löschen, nachtragen), die Klassenübersicht (sortierbar) und konfigurierbare Schnellbuttons unter „Klasse“.
+- Phase 2: Beobachtungen. Im Unterrichtsmodus öffnet Antippen einer Person das Schnellmenü (Mitarbeit +/−, Verhalten +/−, Schnellbuttons, Notiz) mit „Rückgängig“. Am Platz stehen die Zähler von heute. Dazu kommen der Verlauf pro Person (Filter, Summen, bearbeiten, löschen, nachtragen), die Klassenübersicht (sortierbar) und konfigurierbare Schnellbuttons.
+- Phase 3: Backup als Datei (inkl. Fotos) und Import, CSV-Export (Übersicht und alle Einträge), Backup-Erinnerung, Versionen der Sitzordnung (speichern, ansehen, wiederherstellen), Raumvorlagen, PIN-Sperre, Reihenfolge der Klassen-Tabs.
 
 ## Projektstruktur
 
@@ -23,13 +24,17 @@ js/util/ziehen.js       Drag & Drop mit dem Finger
 js/util/foto.js         Fotos verkleinern (400 × 400 px, JPEG)
 js/util/ui.js           Helfer: Elemente bauen, Dialoge, Meldungen, Avatare
 js/util/beobachtung.js  Kategorien, Zeiträume (Heute … Schuljahr), Summen, Datumsformat
+js/util/datei.js        Datei speichern (Laptop: Download, iPhone: Teilen) und Datei wählen
+js/util/sicherung.js    Backup (JSON), Prüfen beim Import, CSV, Backup-Erinnerung
 js/views/plan.js        Ansicht "Sitzplan"
 js/views/raum.js        Ansicht "Raum" (Raster-Editor)
 js/views/schueler.js    Ansicht "SuS"
-js/views/klasse.js      Ansicht "Klasse" + Dialog "Neue Klasse" + Schnellbuttons
+js/views/klasse.js      Ansicht "Mehr": Klasse, Datensicherung, PIN, Schnellbuttons + Dialog "Neue Klasse"
 js/views/schnellmenue.js  Schnellmenü im Unterrichtsmodus
 js/views/person.js      Verlauf einer Person (+ Filterleiste, Eintrag-Dialog)
-js/views/uebersicht.js  Klassenübersicht (Tabelle)
+js/views/uebersicht.js  Klassenübersicht (Tabelle) + CSV-Export
+js/views/versionen.js   Frühere Sitzordnungen
+js/views/sperre.js      PIN-Sperre (Sperrbildschirm, Einstellungen)
 ```
 
 Prinzip: Jede Änderung wird sofort in der Datenbank gespeichert, danach baut
@@ -70,7 +75,7 @@ Das iPhone braucht **https**, sonst gibt es keinen Offline-Modus. GitHub Pages l
 Wichtig fürs iPhone:
 - Die Homescreen-App und Safari haben **getrennte Speicher**. Daten immer in der
   Homescreen-App eingeben, nicht im Safari-Tab.
-- Wird die Homescreen-App gelöscht, sind auch ihre Daten weg. Export/Backup kommt in Phase 3.
+- Wird die Homescreen-App gelöscht, sind auch ihre Daten weg. Deshalb regelmäßig ein Backup machen (siehe unten).
 - Der Code ist öffentlich sichtbar (bei öffentlichem Repo) – die **Daten nicht**,
   die liegen nur auf deinem Handy.
 
@@ -82,13 +87,34 @@ eigenen Fenster, auch offline. Am Laptop funktioniert alles mit der Maus: Ziehen
 Anklicken, Escape schließt Fenster.
 
 **Wichtig:** Laptop und iPhone haben **getrennte Daten**, weil alles lokal gespeichert wird
-und es absichtlich keine Cloud gibt. Daten von einem Gerät aufs andere übertragen
-geht ab Phase 3 mit Export/Import (eine Datei, z. B. per USB-Kabel, OneDrive oder Mail an dich selbst).
+und es absichtlich keine Cloud gibt. Übertragen geht mit einer Backup-Datei (siehe unten).
+
+## Datensicherung und Übertragung
+
+- **Backup erstellen:** „Mehr“ → „Backup erstellen“.
+  - iPhone: Es öffnet sich das Teilen-Menü → „In Dateien sichern“ (iCloud Drive oder „Auf meinem iPhone“).
+  - Laptop: Die Datei landet im Ordner „Downloads“.
+- **Backup einspielen:** „Mehr“ → „Backup einspielen“ (bei einer leeren App direkt auf dem Startbildschirm).
+  **Ersetzt alle Daten auf diesem Gerät.**
+- **iPhone → Laptop:** Am iPhone Backup erstellen, die Datei auf den Laptop bringen (iCloud Drive im
+  Browser, Mail an dich selbst, USB-Kabel) und dort einspielen. Umgekehrt genauso.
+  Am besten immer nur auf **einem** Gerät eintragen und dann übertragen, sonst überschreibt der Import
+  die Einträge des anderen Geräts.
+- Die PIN und die Erinnerungs-Einstellungen bleiben auf dem jeweiligen Gerät, sie sind nicht im Backup.
+- Die Backup-Datei enthält Schülerdaten und Fotos: nicht weitergeben, nicht unverschlüsselt in fremde Clouds legen.
+- **CSV für Excel:** „Übersicht“ → „Übersicht als CSV“ (Summen pro Person im gewählten Zeitraum) oder
+  „Alle Einträge als CSV“ (jede Beobachtung einzeln). Öffnet sich in Excel direkt mit Umlauten.
+
+## PIN-Sperre
+
+„Mehr“ → „PIN-Sperre“. Die PIN wird beim Öffnen abgefragt und nach einer einstellbaren Zeit im
+Hintergrund erneut. Sie ist ein Sichtschutz, keine Verschlüsselung. **PIN vergessen** = nur alle Daten
+auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor du eine PIN setzt.
 
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v2';` erhöhen (v3, v4 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v3';` erhöhen (v4, v5 …).
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.
 4. App am iPhone schließen und neu öffnen (manchmal zweimal). Die Daten bleiben erhalten.

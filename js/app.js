@@ -8,9 +8,12 @@ import { el, toast } from './util/ui.js';
 import { zeichnePlan } from './views/plan.js';
 import { zeichneRaum } from './views/raum.js';
 import { zeichneSchueler } from './views/schueler.js';
-import { zeichneKlasse, neueKlasseDialog } from './views/klasse.js';
+import { zeichneKlasse, neueKlasseDialog, backupErstellen, backupEinspielen } from './views/klasse.js';
 import { zeichneUebersicht } from './views/uebersicht.js';
 import { zeichnePerson } from './views/person.js';
+import { zeichneVersionen } from './views/versionen.js';
+import { sperren, automatischSperren } from './views/sperre.js';
+import { backupErinnerung, erinnerungVerschieben } from './util/sicherung.js';
 
 // Die Ansichten. "versteckt" = erscheint nicht in der unteren Navigation.
 // "breit" = darf am Laptop die ganze Breite nutzen (Tabellen).
@@ -19,8 +22,9 @@ const ANSICHTEN = [
   { id: 'uebersicht', name: 'Übersicht', symbol: '☰', zeichne: zeichneUebersicht, breit: true },
   { id: 'schueler', name: 'SuS', symbol: '👥', zeichne: zeichneSchueler },
   { id: 'raum', name: 'Raum', symbol: '✎', zeichne: zeichneRaum },
-  { id: 'klasse', name: 'Klasse', symbol: '⚙︎', zeichne: zeichneKlasse },
+  { id: 'klasse', name: 'Mehr', symbol: '⚙︎', zeichne: zeichneKlasse },
   { id: 'person', name: 'Verlauf', zeichne: zeichnePerson, versteckt: true },
+  { id: 'versionen', name: 'Versionen', zeichne: zeichneVersionen, versteckt: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -65,6 +69,18 @@ function zeichneKopf() {
 
   const kopf = document.getElementById('kopf');
   kopf.replaceChildren(el('div', { class: 'tabs' }, tabs));
+
+  // Erinnerung an ein Backup (unter den Tabs)
+  if (state.backupFaellig) {
+    kopf.append(el('div', { class: 'banner' },
+      el('span', { class: 'wachsen', text: '💾 ' + state.backupFaellig }),
+      el('button', { class: 'knopf klein primaer', text: 'Jetzt sichern', onclick: backupErstellen }),
+      el('button', {
+        class: 'knopf klein', text: 'Später',
+        onclick: async () => { await erinnerungVerschieben(3); state.backupFaellig = null; neuZeichnen(); },
+      }),
+    ));
+  }
   // Aktiven Tab sichtbar machen, falls die Leiste gescrollt ist
   kopf.querySelector('.tab.aktiv')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
 }
@@ -73,8 +89,9 @@ function zeichneKopf() {
 function zeichneNavi() {
   const navi = document.getElementById('navi');
   if (!aktuelleKlasse()) { navi.replaceChildren(); return; }
-  // In der Verlaufsansicht bleibt der Knopf markiert, von dem man gekommen ist
-  const aktiv = state.ansicht === 'person' ? state.zurueck : state.ansicht;
+  // In versteckten Ansichten bleibt der Knopf markiert, von dem man gekommen ist
+  const aktiv = state.ansicht === 'person' ? state.zurueck
+    : state.ansicht === 'versionen' ? 'plan' : state.ansicht;
   navi.replaceChildren(...ANSICHTEN.filter((a) => !a.versteckt).map((a) => el('button', {
     class: 'navi-knopf' + (aktiv === a.id ? ' aktiv' : ''),
     'aria-current': aktiv === a.id ? 'page' : null,
@@ -86,6 +103,7 @@ async function klasseWechseln(id) {
   state.klasseId = id;
   state.auswahl = null;
   if (state.ansicht === 'person') state.ansicht = state.zurueck; // Verlauf gehört zur alten Klasse
+  state.versionId = null;
   await db.speichereEinstellung('letzteKlasse', id);
   neuZeichnen();
 }
@@ -97,6 +115,8 @@ function zeichneWillkommen(container) {
     el('p', { text: 'Lege deine erste Klasse an. Danach legst du die Sitzplätze fest und trägst die SuS ein.' }),
     el('button', { class: 'knopf primaer', text: '+ Erste Klasse anlegen', onclick: neueKlasseDialog }),
     el('p', { class: 'hinweis', text: 'Alle Daten bleiben ausschließlich auf diesem Gerät.' }),
+    el('p', { class: 'hinweis', text: 'Schon Daten auf einem anderen Gerät? Dort unter „Mehr“ ein Backup erstellen und hier einspielen:' }),
+    el('button', { class: 'knopf', text: '⬆︎ Backup einspielen', onclick: backupEinspielen }),
   ));
 }
 
@@ -104,11 +124,15 @@ function zeichneWillkommen(container) {
 // Start
 // ---------------------------------------------------------------------------
 async function start() {
+  await sperren();          // PIN abfragen (nur wenn eine gesetzt ist)
+  automatischSperren();     // nach einer Pause im Hintergrund wieder sperren
+
   state.klassen = await db.ladeKlassen();
   const letzte = await db.ladeEinstellung('letzteKlasse');
   state.klasseId = state.klassen.some((k) => k.id === letzte) ? letzte : (state.klassen[0]?.id ?? null);
   state.lehrersicht = await db.ladeEinstellung('lehrersicht', true);
   state.modus = 'unterricht'; // beim Start immer gesperrt
+  state.backupFaellig = await backupErinnerung(state.klassen.length);
 
   await neuZeichnen();
   db.dauerhaftSpeichern(); // Browser bitten, die Daten nicht zu löschen

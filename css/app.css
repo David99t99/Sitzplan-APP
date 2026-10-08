@@ -607,3 +607,75 @@ textarea { resize: vertical; }
   .navi-knopf:hover { color: var(--text); }
 }
 .ansicht.breit .unterzeile { text-align: left; }
+
+/* ============================================================ Phase 3 */
+
+/* Backup-Erinnerung unter den Tabs */
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--akzent-hell);
+  border-top: 1px solid var(--rand);
+  font-size: .9rem;
+}
+.banner .wachsen { min-width: 160px; }
+
+.hinweis-warnung { margin: 0; color: var(--gefahr); font-size: .9rem; }
+.haken { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.haken input { width: 22px; height: 22px; min-height: 0; flex: none; }
+
+/* Versionen */
+.version-details { padding: 4px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.raster.vorschau { grid-template-columns: repeat(var(--spalten), minmax(28px, 64px)); grid-auto-rows: 32px; gap: 3px; width: auto; }
+.raster.vorschau .zelle { font-size: .7rem; font-weight: 600; padding: 0 2px; }
+.raster.vorschau .zelle.sitz { border-width: 1px; }
+
+/* <details> als aufklappbarer Bereich ("PIN ändern") */
+details > summary { list-style: none; display: inline-flex; align-items: center; }
+details > summary::-webkit-details-marker { display: none; }
+details[open] > summary { margin-bottom: 12px; }
+.pin-form { display: flex; flex-direction: column; gap: 12px; }
+
+/* ------------------------------------------------------------ Sperrbildschirm */
+body.gesperrt #kopf, body.gesperrt #inhalt, body.gesperrt #navi { visibility: hidden; }
+.sperre {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--hintergrund);
+  padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+}
+.pin-box { display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(320px, 100%); }
+.pin-box h2 { margin: 0; }
+.pin-symbol { font-size: 2.2rem; }
+.pin-punkte { display: flex; gap: 14px; min-height: 18px; }
+.pin-punkt { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--text); }
+.pin-punkt.voll { background: var(--text); }
+.pin-meldung { margin: 0; min-height: 1.4em; color: var(--gefahr); font-weight: 600; }
+.pin-tasten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; }
+.pin-taste {
+  aspect-ratio: 1.25;
+  border: 1px solid var(--rand);
+  border-radius: 18px;
+  background: var(--flaeche);
+  font-size: 1.7rem;
+  font-weight: 600;
+}
+.pin-taste.klein { font-size: .9rem; color: var(--leise); background: transparent; border-color: transparent; }
+.pin-taste:active { background: var(--akzent-hell); }
+.wackeln { animation: wackeln .4s; }
+@keyframes wackeln {
+  20%, 60% { transform: translateX(-10px); }
+  40%, 80% { transform: translateX(10px); }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .pin-box { flex-direction: row; flex-wrap: wrap; justify-content: center; width: min(640px, 100%); }
+  .pin-tasten { width: 300px; gap: 8px; }
+  .pin-taste { aspect-ratio: 2; }
+}

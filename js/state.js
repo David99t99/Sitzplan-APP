@@ -17,6 +17,10 @@ export const state = {
   // Filter für Verlauf und Übersicht (gemeinsam, damit man beim Wechseln nicht neu filtern muss)
   filter: { zeitraum: 'semester', von: '', bis: '', kategorie: 'alle' },
   sortierung: { spalte: 'name', absteigend: false }, // Sortierung der Übersichtstabelle
+
+  // Ab Phase 3
+  versionId: null,      // in der Versionsliste aufgeklappte Version
+  backupFaellig: null,  // Text der Backup-Erinnerung (oder null)
 };
 
 // app.js trägt hier seine Zeichenfunktion ein (vermeidet zirkuläre Importe).

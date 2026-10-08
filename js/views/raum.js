@@ -5,7 +5,7 @@
 
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
-import { el, toast, initialen } from '../util/ui.js';
+import { el, toast, initialen, zeigeDialog, feld } from '../util/ui.js';
 import { FELDTYPEN, feldKey, ausKey, anzeigeReihenfolge, sitzplaetze } from '../util/raster.js';
 import { sichtKnopf, zellGroesse } from './plan.js';
 
@@ -80,6 +80,9 @@ export async function zeichneRaum(container) {
     ),
   );
 
+  // ---------- Raumvorlagen ----------
+  container.append(await vorlagenKarte(plan, klasse));
+
   // ======================= Hilfsfunktionen ==================================
 
   async function feldAntippen(key) {
@@ -132,5 +135,66 @@ function stepper(beschriftung, wert, setze) {
     el('button', { class: 'knopf rund', 'aria-label': beschriftung + ' weniger', text: '−', onclick: () => setze(wert - 1) }),
     el('output', { text: String(wert) }),
     el('button', { class: 'knopf rund', 'aria-label': beschriftung + ' mehr', text: '+', onclick: () => setze(wert + 1) }),
+  );
+}
+
+// Raumvorlagen: aktuelles Raster als Vorlage speichern oder eine Vorlage übernehmen.
+// Praktisch, wenn mehrere Klassen im selben Raum sitzen (z. B. „EDV-Saal“).
+async function vorlagenKarte(plan, klasse) {
+  const vorlagen = await db.ladeVorlagen();
+
+  const speichern = el('button', {
+    class: 'knopf', text: '💾 Als Vorlage speichern',
+    onclick: async () => {
+      const name = el('input', { required: true, maxlength: 40, value: klasse.raum ? `Raum ${klasse.raum}` : '', placeholder: 'z. B. Raum 12 oder EDV-Saal' });
+      const ergebnis = await zeigeDialog({
+        titel: 'Raumvorlage speichern',
+        inhalt: [el('p', { class: 'hinweis', text: 'Speichert nur das Raster (Plätze, Tafel, Tür …), keine SuS.' }), feld('Name der Vorlage', name)],
+        knoepfe: [{ text: 'Abbrechen' }, { text: 'Speichern', wert: 'ok', primaer: true }],
+      });
+      if (ergebnis !== 'ok') return;
+      await db.speichereVorlage(name.value.trim(), plan);
+      toast('Vorlage gespeichert.');
+      app.neuZeichnen();
+    },
+  });
+
+  if (vorlagen.length === 0) {
+    return el('div', { class: 'karte' },
+      el('h2', { text: 'Raumvorlagen' }),
+      el('p', { class: 'hinweis', text: 'Speichere dieses Raster als Vorlage, um es für andere Klassen im selben Raum wiederzuverwenden.' }),
+      el('div', { class: 'leiste' }, speichern));
+  }
+
+  const auswahl = el('select', { 'aria-label': 'Vorlage' },
+    vorlagen.map((v) => el('option', { value: v.id, text: v.name })));
+  const gewaehlt = () => vorlagen.find((v) => v.id === auswahl.value);
+
+  return el('div', { class: 'karte' },
+    el('h2', { text: 'Raumvorlagen' }),
+    el('div', { class: 'leiste' }, auswahl),
+    el('div', { class: 'leiste' },
+      el('button', {
+        class: 'knopf primaer', text: 'Übernehmen',
+        onclick: async () => {
+          const v = gewaehlt();
+          if (!confirm(`Raster „${v.name}“ übernehmen?\nDas aktuelle Raster wird ersetzt. SuS behalten ihren Platz, wenn er weiterhin ein Sitzplatz ist.`)) return;
+          db.vorlageAnwenden(plan, v);
+          await db.speicherePlan(plan);
+          toast(`„${v.name}“ übernommen.`);
+          app.neuZeichnen();
+        },
+      }),
+      el('button', {
+        class: 'knopf gefahr-leise', text: 'Vorlage löschen',
+        onclick: async () => {
+          const v = gewaehlt();
+          if (!confirm(`Vorlage „${v.name}“ löschen? Bestehende Sitzpläne bleiben unverändert.`)) return;
+          await db.loescheVorlage(v.id);
+          app.neuZeichnen();
+        },
+      }),
+      speichern,
+    ),
   );
 }

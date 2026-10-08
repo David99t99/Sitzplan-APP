@@ -54,15 +54,18 @@ export async function ladeKlassen() {
   return db.klassen.orderBy('sortierung').toArray();
 }
 
-// Legt eine Klasse an und gleich dazu einen leeren, aktuellen Sitzplan.
-export async function legeKlasseAn({ name, fach = '', raum = '', schuljahr = '' }) {
+// Legt eine Klasse an und gleich dazu einen aktuellen Sitzplan
+// (leer oder – wenn angegeben – mit dem Raster einer Raumvorlage).
+export async function legeKlasseAn({ name, fach = '', raum = '', schuljahr = '' }, vorlage = null) {
   const alle = await db.klassen.toArray();
   const sortierung = alle.reduce((max, k) => Math.max(max, k.sortierung), 0) + 1;
   const klasse = { id: neueId(), name, fach, raum, schuljahr, sortierung };
+  const plan = leererPlan(klasse.id);
+  if (vorlage) vorlageAnwenden(plan, vorlage);
 
   await db.transaction('rw', db.klassen, db.sitzplaene, async () => {
     await db.klassen.add(klasse);
-    await db.sitzplaene.add(leererPlan(klasse.id));
+    await db.sitzplaene.add(plan);
   });
   return klasse;
 }
@@ -206,6 +209,132 @@ export async function ladeSchnellbuttons() {
 
 export async function speichereSchnellbuttons(liste) {
   await speichereEinstellung('schnellbuttons', liste);
+}
+
+// ============================ Versionen der Sitzordnung ====================
+//
+// Eine Version ist eine eingefrorene Kopie des Sitzplans (aktuell = 0).
+// Sie enthält auch das Raumraster, damit sie nach einem Umbau noch stimmt.
+
+const kopie = (x) => JSON.parse(JSON.stringify(x)); // tiefe Kopie (Objekte in Objekten)
+
+export async function ladeVersionen(klasseId) {
+  const liste = await db.sitzplaene.where({ klasseId, aktuell: 0 }).toArray();
+  return liste.sort((a, b) => b.datum.localeCompare(a.datum)); // neueste zuerst
+}
+
+export async function ladeVersion(id) {
+  return db.sitzplaene.get(id);
+}
+
+// Speichert den übergebenen (aktuellen) Plan als neue Version
+export async function speichereVersion(plan, bezeichnung = '') {
+  const version = {
+    ...kopie(plan),
+    id: neueId(),
+    aktuell: 0,
+    datum: new Date().toISOString(),
+    bezeichnung,
+  };
+  await db.sitzplaene.add(version);
+  return version;
+}
+
+// Holt eine Version zurück. Der bisherige Plan wird vorher automatisch als Version gesichert.
+export async function stelleVersionWiederHer(version) {
+  const plan = await ladeAktuellenPlan(version.klasseId);
+  await speichereVersion(plan, 'Automatisch gesichert vor Wiederherstellen');
+  plan.zeilen = version.zeilen;
+  plan.spalten = version.spalten;
+  plan.felder = kopie(version.felder);
+  plan.zuordnung = kopie(version.zuordnung);
+  await speicherePlan(plan);
+}
+
+export async function loescheVersion(id) {
+  await db.sitzplaene.delete(id);
+}
+
+// ============================ Raumvorlagen =================================
+//
+// Vorlage { id, name, zeilen, spalten, felder } – nur das Raster, keine SuS.
+
+export async function ladeVorlagen() {
+  const liste = await db.vorlagen.toArray();
+  return liste.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+export async function speichereVorlage(name, plan) {
+  const vorlage = { id: neueId(), name, zeilen: plan.zeilen, spalten: plan.spalten, felder: kopie(plan.felder) };
+  await db.vorlagen.add(vorlage);
+  return vorlage;
+}
+
+export async function loescheVorlage(id) {
+  await db.vorlagen.delete(id);
+}
+
+// Überträgt eine Vorlage auf einen Plan. SuS behalten ihren Platz, wenn er weiterhin ein Sitzplatz ist.
+export function vorlageAnwenden(plan, vorlage) {
+  plan.zeilen = vorlage.zeilen;
+  plan.spalten = vorlage.spalten;
+  plan.felder = kopie(vorlage.felder);
+  for (const key of Object.keys(plan.zuordnung)) {
+    if (plan.felder[key] !== 'sitz') delete plan.zuordnung[key];
+  }
+}
+
+// ============================ Reihenfolge der Klassen ======================
+
+// richtung: -1 = nach links, +1 = nach rechts
+export async function verschiebeKlasse(klasseId, richtung) {
+  const liste = await ladeKlassen();
+  const i = liste.findIndex((k) => k.id === klasseId);
+  const j = i + richtung;
+  if (i < 0 || j < 0 || j >= liste.length) return;
+  [liste[i].sortierung, liste[j].sortierung] = [liste[j].sortierung, liste[i].sortierung];
+  await db.klassen.bulkPut([liste[i], liste[j]]);
+}
+
+// ============================ Sicherung (Export/Import) ====================
+
+// Diese Einstellungen gehören zu den Daten und wandern mit ins Backup.
+// Gerätebezogenes (PIN, letztes Backup, Ansicht) bleibt auf dem Gerät.
+const EINSTELLUNGEN_IM_BACKUP = ['schnellbuttons'];
+
+export async function alleDatenLesen() {
+  const einstellungen = (await db.einstellungen.toArray())
+    .filter((e) => EINSTELLUNGEN_IM_BACKUP.includes(e.schluessel));
+  return {
+    klassen: await db.klassen.toArray(),
+    sitzplaene: await db.sitzplaene.toArray(),
+    personen: await db.personen.toArray(),
+    beobachtungen: await db.beobachtungen.toArray(),
+    vorlagen: await db.vorlagen.toArray(),
+    einstellungen,
+  };
+}
+
+// Ersetzt ALLE Klassen-Daten durch die übergebenen (Import eines Backups).
+export async function alleDatenErsetzen(daten) {
+  const tabellen = [db.klassen, db.sitzplaene, db.personen, db.beobachtungen, db.vorlagen, db.einstellungen];
+  await db.transaction('rw', tabellen, async () => {
+    for (const name of ['klassen', 'sitzplaene', 'personen', 'beobachtungen', 'vorlagen']) {
+      await db[name].clear();
+      await db[name].bulkAdd(daten[name] || []);
+    }
+    for (const e of daten.einstellungen || []) {
+      if (EINSTELLUNGEN_IM_BACKUP.includes(e.schluessel)) await db.einstellungen.put(e);
+    }
+    await db.einstellungen.delete('letzteKlasse');
+  });
+}
+
+// Löscht wirklich alles (z. B. wenn die PIN vergessen wurde)
+export async function alleDatenLoeschen() {
+  await db.transaction('rw', db.tables, async () => {
+    for (const t of db.tables) await t.clear();
+  });
 }
 
 // ============================ Einstellungen ================================
