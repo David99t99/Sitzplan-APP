@@ -38,6 +38,9 @@ export function ziehbarMachen(element, { onDrop }) {
         geist.classList.add('geist');
         geist.style.width = r.width + 'px';
         geist.style.height = r.height + 'px';
+        // Die Schriftgrößen im Feld hängen an --zelle; außerhalb des Rasters fehlt der Wert
+        const zelle = getComputedStyle(element).getPropertyValue('--zelle');
+        if (zelle) geist.style.setProperty('--zelle', zelle);
         document.body.append(geist);
         element.classList.add('wird-gezogen');
       }

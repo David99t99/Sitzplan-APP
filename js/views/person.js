@@ -4,6 +4,7 @@
 import { state, app } from '../state.js';
 import * as db from '../db.js';
 import { el, toast, zeigeDialog, feld, avatar, vollerName } from '../util/ui.js';
+import { icon } from '../util/icons.js';
 import {
   ZEITRAEUME, zeitraumGrenzen, imZeitraum, summen, alleKategorien, kategorieName,
   wertZeichen, summeText, tagText, uhrzeitText, fuerEingabe,
@@ -28,9 +29,9 @@ export async function zeichnePerson(container) {
   container.append(
     el('div', { class: 'leiste' },
       el('button', {
-        class: 'knopf klein', text: '‹ Zurück',
+        class: 'knopf klein',
         onclick: () => { state.ansicht = state.zurueck; app.neuZeichnen(); },
-      }),
+      }, icon('links'), 'Zurück'),
     ),
     el('div', { class: 'person-kopf' },
       avatar(person),
@@ -70,12 +71,12 @@ export async function zeichnePerson(container) {
   container.append(el('div', { class: 'leiste' },
     el('h3', { class: 'wachsen', text: `${gefiltert.length} Einträge` }),
     el('button', {
-      class: 'knopf klein', text: '+ Eintrag nachtragen',
+      class: 'knopf klein',
       onclick: async () => {
         const neu = { personId: person.id, klasseId: person.klasseId, kategorie: 'mitarbeit', wert: 1, text: '', zeitpunkt: new Date().toISOString() };
         if (await eintragDialog(neu, schnellbuttons, true)) app.neuZeichnen();
       },
-    }),
+    }, icon('plus'), 'Eintrag nachtragen'),
   ));
 
   if (gefiltert.length === 0) {

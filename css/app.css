@@ -1,53 +1,91 @@
 /* app.css – Aussehen der App.
-   Farben stehen als Variablen oben, damit man sie leicht ändern kann.
-   Dunkler Modus wird automatisch übernommen, wenn das iPhone dunkel eingestellt ist. */
+   Farben, Rundungen und Schatten stehen als Variablen oben, damit man sie leicht ändern kann.
+   Der dunkle Modus wird automatisch übernommen, wenn das Gerät dunkel eingestellt ist. */
 
 :root {
-  --hintergrund: #f4f5f7;
+  /* Flächen und Text */
+  --hintergrund: #f1f3f7;
   --flaeche: #ffffff;
-  --text: #1c1f24;
-  --leise: #6b7280;
-  --rand: #d9dce1;
-  --akzent: #2563eb;
+  --flaeche-2: #f4f6f9;      /* leicht abgesetzt: Chips, Kacheln, Tabellenköpfe */
+  --text: #191c22;
+  --leise: #5f6675;
+  --rand: #e1e5ec;
+  --rand-stark: #c8ced9;
+
+  /* Akzent: das Blau des App-Icons */
+  --akzent: #2563eb;          /* Text, Symbole, Rahmen */
+  --akzent-fuellung: #2563eb; /* gefüllte Knöpfe (weißer Text darauf) */
   --akzent-text: #ffffff;
-  --akzent-hell: #dbe6fd;
-  --gefahr: #c62828;
-  --sitz: #eef1f5;
-  --sitz-rand: #c3c9d2;
-  --tafel: #1f6f43;
-  --pult: #d8a76a;
-  --tuer: #c9ccd2;
-  --leer-editor: #e9ebef;
-  --positiv: #1b8a3a;
-  --negativ: #c62828;
+  --akzent-hell: #e4ecfe;
+
+  /* Bewertung */
+  --positiv: #16803a;
+  --positiv-fuellung: #1a8a40;
+  --positiv-hell: #e0f5e6;
+  --negativ: #c9302c;
+  --negativ-fuellung: #d23b36;
+  --negativ-hell: #fde8e6;
   --neutral: #6b7280;
-  --luecke: 4px;          /* Abstand zwischen Rasterfeldern (auch in plan.js!) */
-  --radius: 10px;
+  --gefahr: #c62828;
+
+  /* Raum */
+  --sitz: #e6e9ef;
+  --sitz-rand: #b9c0cc;
+  --tafel: #25664a;
+  --tafel-text: #e4f2ea;
+  --pult: #e6c493;
+  --pult-text: #5a4220;
+  --tuer: #d5d9e0;
+  --leer-editor: #e7eaef;
+
+  --schatten: 0 1px 2px rgb(16 24 40 / .07), 0 1px 3px rgb(16 24 40 / .06);
+  --schatten-gross: 0 10px 30px rgb(16 24 40 / .18), 0 2px 6px rgb(16 24 40 / .08);
+  --luecke: 5px;           /* Abstand zwischen Rasterfeldern (auch in plan.js!) */
+  --radius: 12px;
+  --radius-gross: 18px;
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --hintergrund: #111317;
-    --flaeche: #1c1f25;
+    --hintergrund: #0f1115;
+    --flaeche: #1a1d23;
+    --flaeche-2: #22262e;
     --text: #eceef2;
-    --leise: #9aa1ad;
-    --rand: #343a44;
-    --akzent: #4f8bff;
-    --akzent-hell: #1f3157;
-    --sitz: #262b33;
-    --sitz-rand: #444c58;
-    --tafel: #2e7d50;
-    --pult: #8a6a43;
-    --tuer: #4a4f58;
-    --leer-editor: #20242b;
-    --positiv: #4cc46c;
-    --negativ: #ff6b6b;
-    --neutral: #9aa1ad;
+    --leise: #9aa2b1;
+    --rand: #2b3039;
+    --rand-stark: #3e4552;
+
+    --akzent: #6d9eff;
+    --akzent-fuellung: #2f6df0;
+    --akzent-hell: #1b2a4b;
+
+    --positiv: #4ccb72;
+    --positiv-fuellung: #1a8a3f;
+    --positiv-hell: #14301e;
+    --negativ: #ff7166;
+    --negativ-fuellung: #cf3a34;
+    --negativ-hell: #3a1a18;
+    --neutral: #8b93a1;
+    --gefahr: #d23b36;
+
+    --sitz: #1d2128;
+    --sitz-rand: #414956;
+    --tafel: #2a7453;
+    --tafel-text: #e4f2ea;
+    --pult: #7a5c38;
+    --pult-text: #f3e2c8;
+    --tuer: #353b46;
+    --leer-editor: #171a20;
+
+    --schatten: 0 1px 2px rgb(0 0 0 / .4);
+    --schatten-gross: 0 12px 32px rgb(0 0 0 / .55);
   }
 }
 
 * { box-sizing: border-box; }
+/* Das Attribut "hidden" soll immer gewinnen (auch gegen display: flex bei Knöpfen) */
+[hidden] { display: none !important; }
 
 html, body {
   margin: 0;
@@ -64,20 +102,44 @@ body {
   font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   touch-action: manipulation;          /* kein Doppeltipp-Zoom */
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
   /* Notch / Dynamic Island im Querformat */
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
 
 button { font: inherit; color: inherit; cursor: pointer; }
-h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
-h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600; }
+h2 { font-size: 1.2rem; line-height: 1.25; letter-spacing: -.01em; margin: 0 0 .75rem; }
+h3 {
+  font-size: .78rem;
+  margin: 0 0 .5rem;
+  color: var(--leise);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* Tastatur am Laptop: gut sichtbarer Fokus (nicht bei Finger/Maus) */
+:focus-visible { outline: 3px solid var(--akzent); outline-offset: 2px; }
+
+/* Strich-Symbole aus js/util/icons.js – übernehmen die Textfarbe */
+.icon {
+  width: 1.25em;
+  height: 1.25em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* ------------------------------------------------------------ Kopf: Tabs */
 #kopf {
   background: var(--flaeche);
   border-bottom: 1px solid var(--rand);
   padding-top: env(safe-area-inset-top);
+  z-index: 10;
 }
 /* Erste Zeile im Kopf: links die Klassen-Tabs, rechts die Versionsanzeige */
 .kopf-zeile { display: flex; align-items: center; }
@@ -85,8 +147,9 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600
 .version {
   flex: none;
   padding: 0 12px 0 4px;
-  font-size: .75rem;
+  font-size: .7rem;
   color: var(--leise);
+  opacity: .8;
 }
 .tabs {
   flex: 1;
@@ -102,19 +165,34 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600
   flex: none;
   min-height: 44px;
   padding: 0 18px;
-  border: 1px solid var(--rand);
+  border: 0;
   border-radius: 22px;
-  background: var(--flaeche);
+  background: var(--hintergrund);
   font-weight: 600;
   white-space: nowrap;
+  transition: background .15s, color .15s;
 }
-.tab.aktiv { background: var(--akzent); border-color: var(--akzent); color: var(--akzent-text); }
-.tab.plus { min-width: 44px; padding: 0; font-size: 1.4rem; line-height: 1; color: var(--akzent); }
+.tab.aktiv {
+  background: var(--akzent-fuellung);
+  color: var(--akzent-text);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--akzent-fuellung) 40%, transparent);
+}
+.tab.plus {
+  width: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1.5px dashed var(--rand-stark);
+  color: var(--akzent);
+}
 
 /* ------------------------------------------------------------ Inhalt */
 #inhalt {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 .ansicht {
   padding: 12px;
@@ -125,61 +203,179 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600
   gap: 12px;
 }
 .leiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* Knöpfe teilen sich die ganze Breite (gut mit dem Daumen zu treffen) */
+.leiste.fuellen > .knopf { flex: 1 1 auto; }
 .hinweis { color: var(--leise); font-size: .9rem; margin: 0; }
 .unterzeile { color: var(--leise); font-size: .9rem; margin: 0; text-align: center; }
 .karte {
   background: var(--flaeche);
   border: 1px solid var(--rand);
-  border-radius: 14px;
+  border-radius: var(--radius-gross);
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: var(--schatten);
 }
-.leer-hinweis { text-align: center; align-items: center; }
-.leer-hinweis p { margin: 0; }
+.karte p { margin: 0; }
+
+/* Kartenkopf mit Symbol links: [Symbol] Überschrift */
+.karten-kopf { display: flex; align-items: center; gap: 10px; }
+.karten-kopf h2 { margin: 0; flex: 1; min-width: 0; }
+.karten-symbol {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--akzent-hell);
+  color: var(--akzent);
+}
+.karten-symbol.gefahr { background: var(--negativ-hell); color: var(--negativ); }
+
+/* Überschrift über einer Gruppe von Karten (Seite "Mehr") */
+.abschnitt-titel {
+  margin: 10px 4px -4px;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--leise);
+}
+
+/* Leerer Zustand: großes Symbol, kurzer Text, EIN klarer nächster Schritt */
+.leer-hinweis { text-align: center; align-items: center; padding: 24px 16px; }
+.leer-symbol {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--akzent-hell);
+  color: var(--akzent);
+  font-size: 1.5rem;
+}
+.leer-hinweis h2 { margin: 0; }
+
+/* Farbiger Hinweis mit nächstem Schritt ("3 SuS haben noch keinen Platz" [Plätze zuweisen]) */
+.tipp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--radius);
+  background: var(--akzent-hell);
+  font-size: .92rem;
+}
+.tipp .wachsen { min-width: 150px; }
+
+/* Startbildschirm ohne Klasse */
+.willkommen { text-align: center; align-items: center; padding: 28px 18px; gap: 14px; }
+.willkommen h2 { font-size: 1.5rem; margin: 0; }
+.logo { width: 84px; height: 84px; border-radius: 20px; box-shadow: var(--schatten-gross); }
+.schritte {
+  list-style: none;
+  counter-reset: schritt;
+  margin: 4px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.schritte li { counter-increment: schritt; display: flex; align-items: center; gap: 12px; }
+.schritte li::before {
+  content: counter(schritt);
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--akzent-hell);
+  color: var(--akzent);
+  font-weight: 700;
+  font-size: .9rem;
+}
+.trenner { width: 100%; height: 1px; background: var(--rand); margin: 4px 0; }
 
 /* ------------------------------------------------------------ Knöpfe */
 .knopf {
-  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
   padding: 0 16px;
-  border: 1px solid var(--rand);
+  border: 1px solid var(--rand-stark);
   border-radius: var(--radius);
   background: var(--flaeche);
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  transition: transform .08s, filter .15s, background .15s;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.knopf:active { filter: brightness(.92); }
-.knopf.primaer { background: var(--akzent); border-color: var(--akzent); color: var(--akzent-text); font-weight: 600; }
-.knopf.gefahr { background: var(--gefahr); border-color: var(--gefahr); color: #fff; }
-.knopf.gefahr-leise { color: var(--gefahr); }
-.knopf.klein { font-size: .9rem; padding: 0 12px; }
-.knopf.rund { width: 44px; padding: 0; font-size: 1.3rem; }
+.knopf:active { transform: scale(.97); filter: brightness(.94); }
+.knopf.primaer {
+  background: var(--akzent-fuellung);
+  border-color: transparent;
+  color: var(--akzent-text);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--akzent-fuellung) 45%, transparent);
+}
+.knopf.gefahr { background: var(--gefahr); border-color: transparent; color: #fff; }
+.knopf.gefahr-leise { color: var(--negativ); border-color: color-mix(in srgb, var(--negativ) 35%, var(--rand-stark)); }
+.knopf.leise { background: transparent; border-color: transparent; color: var(--leise); }
+.knopf.klein { min-height: 44px; font-size: .9rem; padding: 0 12px; gap: 6px; }
+.knopf.rund { width: 46px; padding: 0; }
+.knopf.breit { width: 100%; }
 
 /* Umschalter Unterricht | Bearbeiten */
 .umschalter {
   display: flex;
-  flex: 1;
-  min-width: 230px;
   background: var(--rand);
-  border-radius: 12px;
-  padding: 3px;
-  gap: 3px;
+  border-radius: 14px;
+  padding: 4px;
+  gap: 4px;
 }
 .umschalter-knopf {
   flex: 1;
   min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
+  color: var(--leise);
   font-weight: 600;
-  font-size: .92rem;
   white-space: nowrap;
+  transition: background .15s, color .15s;
 }
-.umschalter-knopf.aktiv { background: var(--flaeche); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
+.umschalter-knopf.aktiv { background: var(--flaeche); color: var(--text); box-shadow: var(--schatten); }
+/* Bearbeiten ist der "besondere" Zustand -> farbig, damit man ihn nicht übersieht */
+.umschalter-knopf.aktiv.bearbeiten { background: var(--akzent-fuellung); color: var(--akzent-text); }
+
+/* Kopf des Sitzplans: Umschalter, darunter eine Zeile mit Fach · Raum (links)
+   und "Ansicht drehen" (rechts). Im Querformat am Handy stehen beide nebeneinander. */
+.plan-kopf { display: flex; flex-direction: column; gap: 4px; margin-bottom: -6px; }
+.plan-info { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.plan-info .unterzeile { text-align: left; padding-left: 4px; }
+.plan-info .unterzeile.akzent { color: var(--akzent); font-weight: 600; }
 
 /* ------------------------------------------------------------ Raster */
 .raster-huelle {
   overflow-x: auto;      /* zu breite Raster lassen sich seitlich schieben */
+  /* Das Raster darf fast bis zum Bildschirmrand reichen (größere Felder am Handy).
+     Bleiben 6 px Rand pro Seite – dieselbe Zahl steckt in zellGroesse() in plan.js. */
+  margin: 0 -8px;
   padding: 6px 2px;
 }
 .raster {
@@ -195,59 +391,90 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600
 }
 .zelle {
   position: relative;   /* für die Zähler-Marken in den Ecken */
-  border-radius: 8px;
+  min-width: 0;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 2px;
   font-size: calc(var(--zelle) * .4);
   line-height: 1;
   overflow: hidden;
 }
 .zelle.leer { background: transparent; }
 .zelle.sitz { background: var(--sitz); border: 1.5px dashed var(--sitz-rand); }
-.zelle.sitz.besetzt { border-style: solid; background: var(--flaeche); }
-.zelle.tafel { background: var(--tafel); }
-.zelle.pult { background: var(--pult); }
-.zelle.tuer { background: var(--tuer); }
-.zelle .avatar { width: 62%; }
+.zelle.sitz.besetzt {
+  border: 1px solid var(--rand-stark);
+  background: var(--flaeche);
+  box-shadow: var(--schatten);
+}
+.zelle.tafel { background: var(--tafel); color: var(--tafel-text); box-shadow: inset 0 0 0 2px rgb(255 255 255 / .16); }
+.zelle.pult { background: var(--pult); color: var(--pult-text); }
+.zelle.tuer { background: var(--tuer); color: var(--leise); }
+.zelle .icon { width: min(22px, 70%); height: min(22px, 70%); }
+.zelle .avatar { width: 54%; }
 .zelle .name {
-  font-size: max(9px, calc(var(--zelle) * .19));
+  font-size: max(9.5px, calc(var(--zelle) * .2));
   font-weight: 600;
-  max-width: 96%;
+  letter-spacing: -.01em;
+  max-width: 100%;
+  padding: 0 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Beschriftung von Tafel, Lehrertisch, Tür im Sitzplan */
+.moebel-text {
+  max-width: 100%;
+  padding: 0 4px;
+  font-size: max(9px, min(13px, calc(var(--zelle) * .2)));
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Sitzplan: Zeilen und Spalten kommen als Stil aus plan.js (Gänge sind schmaler) */
+.raster.plan .zelle.besetzt { cursor: pointer; transition: transform .08s; }
+.raster.plan:not(.bearbeiten) .zelle.besetzt:active { transform: scale(.93); }
+/* Eine Person ist markiert -> freie und besetzte Plätze als Ziel hervorheben */
+.raster.plan.waehlt .zelle.sitz:not(.ausgewaehlt) { border-color: var(--akzent); cursor: pointer; }
+
 /* Raum-Editor: leere Felder sichtbar machen */
-.raster.editor .zelle { cursor: pointer; font-size: calc(var(--zelle) * .36); font-weight: 700; }
-.raster.editor .zelle.leer { background: var(--leer-editor); border: 1px solid var(--rand); }
-.raster.editor .zelle.sitz { border-style: solid; }
+.raster.editor .zelle { cursor: pointer; font-size: calc(var(--zelle) * .34); font-weight: 700; color: var(--leise); }
+.raster.editor .zelle:active { filter: brightness(.9); }
+.raster.editor .zelle.leer { background: var(--leer-editor); border: 1px dashed var(--rand-stark); }
+.raster.editor .zelle.sitz { border: 1.5px solid var(--sitz-rand); background: var(--flaeche); box-shadow: var(--schatten); }
+.raster.editor .zelle.tafel { color: var(--tafel-text); }
+.raster.editor .zelle.pult { color: var(--pult-text); }
 .vorne-markierung {
   text-align: center;
-  font-size: .75rem;
+  font-size: .72rem;
+  font-weight: 700;
   letter-spacing: .15em;
   text-transform: uppercase;
   color: var(--leise);
-  margin: 4px 0;
+  margin: 6px 0;
 }
 
 /* Auswahl und Ziehen */
-.ausgewaehlt { outline: 3px solid var(--akzent); outline-offset: 1px; }
+.ausgewaehlt { outline: 3px solid var(--akzent); outline-offset: 1px; background: var(--akzent-hell) !important; }
 .ziel-hover { outline: 3px dashed var(--akzent); outline-offset: 1px; background: var(--akzent-hell) !important; }
 .wird-gezogen { opacity: .35; }
 .raster.bearbeiten .zelle.besetzt,
-.chip { touch-action: none; }   /* Finger zieht die Person statt die Seite zu scrollen */
+.ohne-platz.haftend .chip { touch-action: none; }   /* Finger zieht die Person statt die Seite zu scrollen */
+.raster.bearbeiten .zelle.besetzt, .ohne-platz.haftend .chip { cursor: grab; }
 .geist {
   position: fixed;
   left: 0;
   top: 0;
   z-index: 1000;
   pointer-events: none;
-  opacity: .92;
-  box-shadow: 0 8px 24px rgb(0 0 0 / .3);
+  opacity: .95;
+  box-shadow: var(--schatten-gross) !important;
 }
 
 /* ------------------------------------------------------------ Avatar */
@@ -269,65 +496,115 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600
 .ohne-platz {
   background: var(--flaeche);
   border: 1px solid var(--rand);
-  border-radius: 14px;
+  border-radius: var(--radius-gross);
   padding: 12px;
+  box-shadow: var(--schatten);
 }
+.ohne-platz-kopf { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ohne-platz-kopf h3 { margin: 0; }
+.ohne-platz-kopf .hinweis { flex: 1; min-width: 0; text-align: right; font-size: .82rem; }
+/* Im Bearbeitungsmodus bleibt die Leiste unten stehen: Person und Raster sind
+   gleichzeitig zu sehen, auch wenn die Seite länger als der Bildschirm ist. */
+.ohne-platz.haftend {
+  position: sticky;
+  bottom: 8px;
+  z-index: 5;
+  box-shadow: var(--schatten-gross);
+}
+/* Eine sitzende Person ist markiert -> die Leiste ist die Ablage "vom Platz nehmen" */
+.ohne-platz.ablage { border: 2px dashed var(--akzent); background: var(--akzent-hell); cursor: pointer; }
+.ohne-platz.ablage .hinweis { color: var(--akzent); font-weight: 600; }
+
 .chips { display: flex; flex-wrap: wrap; gap: 8px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+/* Eine Zeile, seitlich wischbar. Der Finger wischt waagrecht durch die Liste
+   und zieht eine Person nach OBEN heraus (touch-action: pan-x). */
+.chips.reihe {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: 0 -12px;
+  padding: 5px 12px;
+  scrollbar-width: none;
+}
+.chips.reihe::-webkit-scrollbar { display: none; }
+.chips.reihe .chip { touch-action: pan-x; }
 .chip {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 4px 14px 4px 4px;
-  border: 1px solid var(--rand);
+  min-height: 48px;
+  padding: 4px 14px 4px 5px;
+  border: 1px solid var(--rand-stark);
   border-radius: 24px;
-  background: var(--hintergrund);
+  background: var(--flaeche-2);
   font-weight: 600;
-  cursor: grab;
 }
-.chip .avatar { width: 36px; }
+.chip .avatar { width: 38px; }
+/* Mit der Maus (Laptop) lässt sich eine Zeile schlecht seitlich schieben -> umbrechen */
+@media (hover: hover) and (pointer: fine) {
+  .chips.reihe { flex-wrap: wrap; max-height: 30vh; overflow-y: auto; }
+}
 
-/* ------------------------------------------------------------ Raum-Editor: Werkzeuge */
+/* ------------------------------------------------------------ Werkzeuge
+   (Raum-Editor: 5 Feldtypen · Sitzplan bearbeiten: 3 Aktionen) */
 .werkzeuge { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.werkzeuge.drei { grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .werkzeug {
-  min-height: 56px;
-  border: 1px solid var(--rand);
+  min-height: 60px;
+  border: 1px solid var(--rand-stark);
   border-radius: var(--radius);
   background: var(--flaeche);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  font-size: .72rem;
-  padding: 4px 2px;
+  gap: 5px;
+  font-size: .74rem;
+  font-weight: 600;
+  line-height: 1.15;
+  padding: 6px 2px;
+  transition: transform .08s, background .15s;
 }
-.werkzeug.aktiv { border: 2px solid var(--akzent); background: var(--akzent-hell); font-weight: 600; }
+.werkzeug:active { transform: scale(.96); }
+.werkzeug .icon { width: 22px; height: 22px; color: var(--akzent); }
+.werkzeug.aktiv { border: 2px solid var(--akzent); background: var(--akzent-hell); }
 .muster {
-  width: 26px;
-  height: 20px;
-  border-radius: 5px;
+  width: 28px;
+  height: 22px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: .8rem;
 }
-.muster.sitz { background: var(--sitz); border: 1.5px solid var(--sitz-rand); }
+.muster .icon { width: 16px; height: 16px; color: var(--leise); }
+.muster.sitz { background: var(--flaeche); border: 1.5px solid var(--sitz-rand); }
 .muster.tafel { background: var(--tafel); }
 .muster.pult { background: var(--pult); }
 .muster.tuer { background: var(--tuer); }
-.muster.leer { background: var(--leer-editor); border: 1px solid var(--rand); }
+.muster.leer { background: var(--leer-editor); border: 1px dashed var(--rand-stark); }
 
-.stepper { display: inline-flex; align-items: center; gap: 6px; }
-.stepper-titel { font-size: .9rem; color: var(--leise); }
-.stepper output { min-width: 1.6em; text-align: center; font-weight: 700; }
+/* Regler im Raum-Editor: kleine Beschriftung, darunter das Bedienelement */
+.regler-zeile { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 8px; }
+.regler { display: flex; flex-direction: column; gap: 3px; }
+.regler-titel { font-size: .8rem; font-weight: 600; color: var(--leise); }
+.stepper { display: inline-flex; align-items: center; gap: 4px; }
+.stepper output { min-width: 1.7em; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-/* ------------------------------------------------------------ SuS-Liste */
-.liste { list-style: none; margin: 0; padding: 0; background: var(--flaeche); border: 1px solid var(--rand); border-radius: 14px; overflow: hidden; }
+/* ------------------------------------------------------------ Listen */
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: var(--radius-gross);
+  overflow: hidden;
+  box-shadow: var(--schatten);
+}
 .liste li + li { border-top: 1px solid var(--rand); }
 .zeile {
   width: 100%;
-  min-height: 60px;
+  min-height: 62px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -336,51 +613,91 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600
   background: transparent;
   text-align: left;
 }
+.zeile:active { background: var(--flaeche-2); }
 .zeile .avatar { width: 44px; }
 .zeile-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.zeile-text strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .zeile-text small { color: var(--leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pfeil { color: var(--leise); font-size: 1.4rem; }
+.pfeil { color: var(--leise); display: flex; }
+/* Kleine Marke rechts in einer Zeile ("ohne Platz") */
+.etikett {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: var(--flaeche-2);
+  border: 1px solid var(--rand);
+  color: var(--leise);
+  font-size: .75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* ------------------------------------------------------------ Formulare + Dialoge */
-.feld { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--leise); }
+.feld { display: flex; flex-direction: column; gap: 5px; font-size: .85rem; font-weight: 600; color: var(--leise); }
+/* Zwei kurze Felder nebeneinander (Raum | Schuljahr) */
+.feld-reihe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 input, textarea, select {
   font: inherit;
   font-size: 16px;   /* unter 16 px zoomt das iPhone beim Antippen hinein */
+  font-weight: 400;
   color: var(--text);
   background: var(--flaeche);
-  border: 1px solid var(--rand);
-  border-radius: 8px;
-  padding: 10px;
+  border: 1px solid var(--rand-stark);
+  border-radius: 10px;
+  padding: 10px 12px;
   width: 100%;
-  min-height: 44px;
+  min-height: 46px;
+  transition: border-color .15s, box-shadow .15s;
 }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--akzent);
+  box-shadow: 0 0 0 3px var(--akzent-hell);
+}
+input::placeholder, textarea::placeholder { color: var(--leise); opacity: .7; }
 textarea { resize: vertical; }
+/* Eigener Pfeil, damit Auswahlfelder auf iPhone und Windows gleich aussehen */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a92a0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 18px;
+}
 
 .dialog {
   width: min(94vw, 480px);
   max-height: 90dvh;
   border: 0;
-  border-radius: 16px;
-  padding: 18px;
+  border-radius: 20px;
+  padding: 20px;
   background: var(--flaeche);
   color: var(--text);
+  box-shadow: var(--schatten-gross);
 }
-.dialog::backdrop { background: rgb(0 0 0 / .45); }
+.dialog::backdrop { background: rgb(8 12 20 / .5); }
+.dialog[open] { animation: dialog-ein .18s ease-out; }
+@keyframes dialog-ein { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 .dialog-inhalt { display: flex; flex-direction: column; gap: 12px; }
+.dialog-inhalt p { margin: 0; }
 .dialog-knoepfe {
   display: flex;
   flex-direction: row-reverse;   /* siehe zeigeDialog() in ui.js */
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 18px;
 }
-.dialog-knoepfe .knopf { flex: 1; }
+/* Passen nicht alle Knöpfe in eine Zeile, rutscht der unwichtigste ("Löschen") nach unten */
+.dialog-knoepfe .knopf { flex: 1 1 auto; min-height: 48px; white-space: nowrap; }
 
 .foto-bereich { display: flex; align-items: center; gap: 14px; }
-.foto-vorschau { width: 88px; flex: none; }
-.foto-vorschau .avatar { width: 88px; }
-.foto-knoepfe { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.foto-vorschau { width: 96px; flex: none; }
+.foto-vorschau .avatar { width: 96px; }
+.foto-knoepfe { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+.foto-knoepfe .knopf { flex: 1 1 auto; }
 
 /* ------------------------------------------------------------ Navigation unten */
 #navi {
@@ -388,56 +705,90 @@ textarea { resize: vertical; }
   grid-template-columns: repeat(5, 1fr);
   background: var(--flaeche);
   border-top: 1px solid var(--rand);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+  z-index: 10;
 }
 #navi:empty { display: none; }
+/* Am Laptop rücken die Knöpfe in der Mitte zusammen (kurze Mauswege) */
+@media (min-width: 800px) {
+  #navi { grid-template-columns: repeat(5, minmax(0, 150px)); justify-content: center; }
+}
 .navi-knopf {
   min-height: 56px;
   border: 0;
+  border-radius: 14px;
   background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  font-size: .75rem;
+  gap: 3px;
+  font-size: .72rem;
+  font-weight: 500;
   color: var(--leise);
 }
-.navi-knopf.aktiv { color: var(--akzent); font-weight: 600; }
-.navi-symbol { font-size: 1.3rem; line-height: 1; }
+/* Das Symbol sitzt in einer "Pille", die beim aktiven Knopf farbig wird */
+.navi-symbol {
+  width: 56px;
+  height: 30px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s;
+}
+.navi-symbol .icon { width: 22px; height: 22px; }
+.navi-knopf.aktiv { color: var(--akzent); font-weight: 700; }
+.navi-knopf.aktiv .navi-symbol { background: var(--akzent-hell); }
+.navi-knopf:active .navi-symbol { background: var(--rand); }
 
 /* ------------------------------------------------------------ Toast */
 #toast {
   position: fixed;
   left: 50%;
-  bottom: calc(72px + env(safe-area-inset-bottom));
+  bottom: calc(80px + env(safe-area-inset-bottom));
   transform: translate(-50%, 20px);
+  width: max-content;
   max-width: min(92vw, 480px);
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  background: #23272e;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: #1f232b;
   color: #fff;
   font-size: .95rem;
+  box-shadow: var(--schatten-gross);
   opacity: 0;
   pointer-events: none;
   transition: opacity .2s, transform .2s;
   z-index: 2000;
 }
 #toast.sichtbar { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-.toast-knopf { border: 0; background: transparent; color: #8fb4ff; font-weight: 700; min-height: 44px; }
+.toast-knopf {
+  border: 0;
+  background: transparent;
+  color: #9dbcff;
+  font-weight: 700;
+  min-height: 44px;
+  margin: -12px -8px -12px 0;
+  padding: 0 8px;
+}
 
 /* ------------------------------------------------------------ Querformat am Handy:
    Kopf und Navigation schlanker, damit mehr Platz für den Sitzplan bleibt */
 @media (orientation: landscape) and (max-height: 500px) {
   .tabs { padding: 4px 12px; }
-  .navi-knopf { min-height: 44px; flex-direction: row; gap: 6px; font-size: .85rem; }
+  #navi { padding-top: 0; padding-bottom: env(safe-area-inset-bottom); }
+  .navi-knopf { min-height: 44px; flex-direction: row; gap: 4px; font-size: .85rem; }
+  .navi-symbol { width: 36px; }
   .ansicht { padding-top: 8px; gap: 8px; }
+  .plan-kopf { flex-direction: row; align-items: center; gap: 12px; margin-bottom: 0; }
+  .plan-kopf .umschalter { flex: 0 0 300px; }
+  .plan-kopf .plan-info { flex: 1; min-width: 0; }
 }
 
-/* ============================================================ Phase 2: Beobachtungen */
+/* ============================================================ Beobachtungen */
 
 .positiv { color: var(--positiv); }
 .negativ { color: var(--negativ); }
@@ -447,31 +798,37 @@ textarea { resize: vertical; }
 /* Am Laptop: Tabellen dürfen breiter werden */
 .ansicht.breit { max-width: 1400px; }
 
-/* ------------------------------------------------------------ Zähler am Platz */
+/* ------------------------------------------------------------ Zähler am Platz
+   Links oben die Minus-, rechts oben die Plus-Einträge von heute: so sieht man
+   beim Blick über die Klasse sofort, wo etwas Rotes oder Grünes steht. */
 .marken {
   position: absolute;
   top: 1px;
+  left: 1px;
   right: 1px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
+  justify-content: space-between;
+  align-items: flex-start;
   pointer-events: none;
 }
-.chip .marken { position: static; flex-direction: row; }
+.marken-seite { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.marken-seite.rechts { align-items: flex-end; }
+.chip .marken { position: static; gap: 4px; }
+.chip .marken-seite { flex-direction: row; gap: 4px; }
 .marke {
-  min-width: 16px;
-  padding: 0 3px;
-  border-radius: 8px;
-  font-size: max(9px, calc(var(--zelle, 50px) * .15));
+  min-width: 1.5em;
+  padding: 0 .2em;
+  border-radius: 1em;
+  font-size: max(9px, calc(var(--zelle, 62px) * .16));
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.45;
   text-align: center;
   color: #fff;
+  box-shadow: 0 0 0 1px var(--flaeche);
 }
-.marke.positiv { background: var(--positiv); color: #fff; }
-.marke.negativ { background: var(--negativ); color: #fff; }
-.marke.neutral { background: var(--neutral); color: #fff; min-width: 0; }
+.marke.positiv { background: var(--positiv-fuellung); color: #fff; }
+.marke.negativ { background: var(--negativ-fuellung); color: #fff; }
+.marke.neutral { background: var(--neutral); color: #fff; min-width: 0; width: .8em; height: .8em; padding: 0; margin: .15em; }
 
 /* ------------------------------------------------------------ Schnellmenü (Blatt von unten) */
 .dialog.blatt {
@@ -479,46 +836,64 @@ textarea { resize: vertical; }
   margin: auto auto 0;            /* Handy: unten am Bildschirm */
   width: 100%;
   max-width: 520px;
-  border-radius: 18px 18px 0 0;
+  border-radius: 22px 22px 0 0;
 }
+.dialog.blatt[open] { animation: blatt-ein .22s cubic-bezier(.2, .8, .2, 1); }
+@keyframes blatt-ein { from { transform: translateY(40%); opacity: 0; } }
 .blatt-inhalt {
-  padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  padding: 8px 14px calc(14px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+/* Kleiner Griff oben, wie bei den Blättern von iOS */
+.blatt-inhalt::before {
+  content: "";
+  align-self: center;
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--rand-stark);
+}
 .blatt-kopf { display: flex; align-items: center; gap: 10px; }
-.blatt-kopf .avatar { width: 48px; }
+.blatt-kopf .avatar { width: 52px; }
 .blatt-name { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.blatt-name strong { font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blatt-name strong { font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .blatt-name small { color: var(--leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .heute-liste { margin: 0; font-size: .85rem; color: var(--leise); display: flex; flex-wrap: wrap; gap: 4px 8px; }
 .heute-eintrag { white-space: nowrap; }
 
-.pm-zeile { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: center; }
-.pm-titel { font-weight: 600; }
+.pm-zeile { display: grid; grid-template-columns: minmax(0, 1fr) 1fr 1fr; gap: 8px; align-items: center; }
+.pm-titel { font-weight: 700; font-size: 1.02rem; }
 .pm {
-  min-height: 64px;               /* große Daumenfläche */
+  min-height: 66px;               /* große Daumenfläche */
   border: 0;
-  border-radius: 14px;
-  font-size: 2rem;
-  font-weight: 700;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #fff;
+  transition: transform .08s, filter .15s;
 }
-.pm.plus { background: var(--positiv); }
-.pm.minus { background: var(--negativ); }
-.pm:active { transform: scale(.96); }
+.pm .icon { width: 30px; height: 30px; stroke-width: 3; }
+.pm.plus { background: var(--positiv-fuellung); }
+.pm.minus { background: var(--negativ-fuellung); }
+.pm:active { transform: scale(.95); filter: brightness(.92); }
 
 .sb-raster { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.knopf.sb { min-height: 52px; font-size: .92rem; line-height: 1.2; padding: 4px 10px; }
-.knopf.sb.negativ { border-color: color-mix(in srgb, var(--negativ) 45%, var(--rand)); color: var(--text); }
-.knopf.sb.positiv { border-color: color-mix(in srgb, var(--positiv) 45%, var(--rand)); color: var(--text); }
+.knopf.sb { min-height: 54px; font-size: .92rem; padding: 4px 10px; }
+.knopf.sb.negativ { background: var(--negativ-hell); border-color: transparent; color: var(--text); }
+.knopf.sb.positiv { background: var(--positiv-hell); border-color: transparent; color: var(--text); }
+.knopf.sb.neutral { background: var(--flaeche-2); color: var(--text); }
 .notiz-zeile { display: flex; gap: 8px; }
 .notiz-zeile input { flex: 1; }
 
 /* Am Laptop / Tablet: Schnellmenü als Fenster in der Mitte */
 @media (min-width: 700px) and (min-height: 600px) {
-  .dialog.blatt { margin: auto; border-radius: 18px; }
+  .dialog.blatt { margin: auto; border-radius: 22px; }
+  .dialog.blatt[open] { animation: dialog-ein .18s ease-out; }
+  .blatt-inhalt { padding-top: 14px; }
+  .blatt-inhalt::before { display: none; }
 }
 
 /* ------------------------------------------------------------ Filter */
@@ -537,24 +912,26 @@ textarea { resize: vertical; }
   gap: 4px;
   align-items: flex-start;
   text-align: left;
-  min-height: 64px;
+  min-height: 66px;
   padding: 10px 12px;
   border: 1px solid var(--rand);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--flaeche);
+  box-shadow: var(--schatten);
 }
-.kachel.aktiv { border: 2px solid var(--akzent); background: var(--akzent-hell); }
-.kachel-titel { font-size: .8rem; color: var(--leise); }
-.kachel-wert { font-size: 1.05rem; }
+.kachel:active { transform: scale(.98); }
+.kachel.aktiv { border: 2px solid var(--akzent); background: var(--akzent-hell); padding: 9px 11px; }
+.kachel-titel { font-size: .8rem; color: var(--leise); font-weight: 600; }
+.kachel-wert { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
 
 .liste .tag-kopf {
-  padding: 8px 12px 4px;
+  padding: 8px 12px 6px;
   font-size: .8rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--leise);
-  background: var(--hintergrund);
+  background: var(--flaeche-2);
 }
-.zeile.eintrag { min-height: 52px; }
+.zeile.eintrag { min-height: 54px; }
 .eintrag-zeichen {
   width: 32px;
   height: 32px;
@@ -565,9 +942,11 @@ textarea { resize: vertical; }
   justify-content: center;
   font-weight: 700;
   font-size: 1.2rem;
-  background: var(--hintergrund);
+  background: var(--flaeche-2);
 }
-.eintrag-zeit { color: var(--leise); font-variant-numeric: tabular-nums; }
+.eintrag-zeichen.positiv { background: var(--positiv-hell); }
+.eintrag-zeichen.negativ { background: var(--negativ-hell); }
+.eintrag-zeit { color: var(--leise); font-variant-numeric: tabular-nums; font-size: .9rem; }
 
 /* ------------------------------------------------------------ Klassenübersicht */
 .tabelle-huelle {
@@ -576,19 +955,21 @@ textarea { resize: vertical; }
   overflow-x: auto;
   background: var(--flaeche);
   border: 1px solid var(--rand);
-  border-radius: 14px;
+  border-radius: var(--radius-gross);
+  box-shadow: var(--schatten);
 }
 .tabelle { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
 .tabelle thead th[rowspan] { white-space: normal; max-width: 96px; line-height: 1.2; }
-.tabelle th, .tabelle td { padding: 8px 10px; border-bottom: 1px solid var(--rand); white-space: nowrap; }
-.tabelle thead th { font-size: .8rem; color: var(--leise); font-weight: 600; background: var(--flaeche); }
+.tabelle th, .tabelle td { padding: 10px; border-bottom: 1px solid var(--rand); white-space: nowrap; }
+.tabelle thead th { font-size: .8rem; color: var(--leise); font-weight: 700; background: var(--flaeche-2); }
 .tabelle th.gruppe { text-align: center; border-bottom: 0; padding-bottom: 0; color: var(--text); }
-.tabelle th.sortierbar { cursor: pointer; user-select: none; min-height: 44px; }
+.tabelle th.sortierbar { cursor: pointer; user-select: none; -webkit-user-select: none; padding-top: 13px; padding-bottom: 13px; }
 .tabelle th.sortiert { color: var(--akzent); }
 .tabelle tbody tr { cursor: pointer; }
+.tabelle tbody tr:active > * { background: var(--flaeche-2); }
 .tabelle tbody tr:last-child > * { border-bottom: 0; }
 .tabelle td.zahl { text-align: center; min-width: 38px; }
-.tabelle td.null { color: var(--rand); }
+.tabelle td.null { color: var(--rand-stark); }
 .tabelle td.summe { font-weight: 700; }
 .tabelle td.summe.null { color: var(--leise); font-weight: 400; }
 /* Erste Spalte bleibt beim seitlichen Scrollen stehen */
@@ -600,8 +981,18 @@ textarea { resize: vertical; }
   text-align: left;
   border-right: 1px solid var(--rand);
 }
+.tabelle thead .name-spalte { background: var(--flaeche-2); }
 .name-zelle { display: flex; align-items: center; gap: 8px; font-weight: 600; min-height: 32px; }
 .name-zelle .avatar { width: 30px; }
+.name-zelle span { overflow: hidden; text-overflow: ellipsis; }
+/* Handy: Name schmaler (ohne Foto), damit Mitarbeit UND Verhalten ohne Schieben sichtbar sind */
+@media (max-width: 600px) {
+  .tabelle th, .tabelle td { padding-left: 6px; padding-right: 6px; }
+  .tabelle td.zahl { min-width: 33px; }
+  .name-zelle { max-width: 31vw; }
+  .name-zelle .avatar { display: none; }
+  .tabelle .name-spalte { padding-left: 12px; }
+}
 
 /* ------------------------------------------------------------ Schnellbuttons einstellen */
 .sb-eintrag { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; }
@@ -609,17 +1000,22 @@ textarea { resize: vertical; }
 .sb-neu { display: flex; flex-wrap: wrap; gap: 8px; }
 .sb-neu input { flex: 2 1 180px; width: auto; }
 .sb-neu select { flex: 1 1 110px; width: auto; }
+.sb-neu .knopf { flex: 1 1 auto; }
+.karte .liste { box-shadow: none; border-radius: var(--radius); }
 
 /* ------------------------------------------------------------ Maus (Laptop): Hover-Effekte */
 @media (hover: hover) {
-  .knopf:hover, .tab:hover, .werkzeug:hover, .kachel:hover { filter: brightness(.96); }
-  .zeile:hover, .tabelle tbody tr:hover > * { background: var(--hintergrund); }
-  .raster:not(.bearbeiten) .zelle.besetzt:hover { box-shadow: 0 0 0 2px var(--akzent); cursor: pointer; }
+  .knopf:hover, .werkzeug:hover, .kachel:hover, .pm:hover { filter: brightness(.96); }
+  .tab:not(.aktiv):hover { background: var(--rand); }
+  .zeile:hover, .tabelle tbody tr:hover > * { background: var(--flaeche-2); }
+  .raster.plan:not(.bearbeiten) .zelle.besetzt:hover { box-shadow: 0 0 0 2px var(--akzent); }
+  .raster.editor .zelle:hover { filter: brightness(.95); }
   .navi-knopf:hover { color: var(--text); }
+  .navi-knopf.aktiv:hover { color: var(--akzent); }
 }
 .ansicht.breit .unterzeile { text-align: left; }
 
-/* ============================================================ Phase 3 */
+/* ============================================================ Sicherung, Versionen, PIN */
 
 /* Backup-Erinnerung unter den Tabs */
 .banner {
@@ -632,17 +1028,31 @@ textarea { resize: vertical; }
   border-top: 1px solid var(--rand);
   font-size: .9rem;
 }
-.banner .wachsen { min-width: 160px; }
+.banner .wachsen { min-width: 160px; display: flex; align-items: center; gap: 8px; }
+.banner .icon { color: var(--akzent); }
 
-.hinweis-warnung { margin: 0; color: var(--gefahr); font-size: .9rem; }
+.hinweis-warnung {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--negativ-hell);
+  color: var(--negativ);
+  font-size: .9rem;
+  font-weight: 500;
+}
 .haken { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
-.haken input { width: 22px; height: 22px; min-height: 0; flex: none; }
+.haken input { width: 22px; height: 22px; min-height: 0; flex: none; accent-color: var(--akzent); }
+/* Zeile "Status: ✓ aktiv" in den Karten der Seite "Mehr" */
+.status { display: flex; align-items: center; gap: 8px; margin: 0; font-size: .9rem; font-weight: 600; }
+.status.gut { color: var(--positiv); }
+.status.warnung { color: var(--text); }
 
 /* Versionen */
 .version-details { padding: 4px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .raster.vorschau { grid-template-columns: repeat(var(--spalten), minmax(28px, 64px)); grid-auto-rows: 32px; gap: 3px; width: auto; }
-.raster.vorschau .zelle { font-size: .7rem; font-weight: 600; padding: 0 2px; }
+.raster.vorschau .zelle { font-size: .7rem; font-weight: 600; padding: 0 2px; border-radius: 6px; box-shadow: none; }
 .raster.vorschau .zelle.sitz { border-width: 1px; }
+.raster.vorschau .zelle.tafel { box-shadow: none; }
 
 /* <details> als aufklappbarer Bereich ("PIN ändern") */
 details > summary { list-style: none; display: inline-flex; align-items: center; }
@@ -664,22 +1074,37 @@ body.gesperrt #kopf, body.gesperrt #inhalt, body.gesperrt #navi { visibility: hi
 }
 .pin-box { display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(320px, 100%); }
 .pin-box h2 { margin: 0; }
-.pin-symbol { font-size: 2.2rem; }
+.pin-symbol {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--akzent-hell);
+  color: var(--akzent);
+  font-size: 1.6rem;
+}
 .pin-punkte { display: flex; gap: 14px; min-height: 18px; }
-.pin-punkt { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--text); }
-.pin-punkt.voll { background: var(--text); }
-.pin-meldung { margin: 0; min-height: 1.4em; color: var(--gefahr); font-weight: 600; }
-.pin-tasten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; }
+.pin-punkt { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--leise); transition: background .1s; }
+.pin-punkt.voll { background: var(--akzent); border-color: var(--akzent); }
+.pin-meldung { margin: 0; min-height: 1.4em; color: var(--negativ); font-weight: 600; }
+.pin-tasten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; }
 .pin-taste {
   aspect-ratio: 1.25;
   border: 1px solid var(--rand);
-  border-radius: 18px;
+  border-radius: 20px;
   background: var(--flaeche);
   font-size: 1.7rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--schatten);
+  transition: transform .08s, background .1s;
 }
-.pin-taste.klein { font-size: .9rem; color: var(--leise); background: transparent; border-color: transparent; }
-.pin-taste:active { background: var(--akzent-hell); }
+.pin-taste.klein { font-size: .9rem; color: var(--leise); background: transparent; border-color: transparent; box-shadow: none; }
+.pin-taste:active { background: var(--akzent-hell); transform: scale(.95); }
 .wackeln { animation: wackeln .4s; }
 @keyframes wackeln {
   20%, 60% { transform: translateX(-10px); }
@@ -689,4 +1114,9 @@ body.gesperrt #kopf, body.gesperrt #inhalt, body.gesperrt #navi { visibility: hi
   .pin-box { flex-direction: row; flex-wrap: wrap; justify-content: center; width: min(640px, 100%); }
   .pin-tasten { width: 300px; gap: 8px; }
   .pin-taste { aspect-ratio: 2; }
+}
+
+/* Wer am Gerät "Bewegung reduzieren" eingestellt hat, bekommt keine Animationen */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

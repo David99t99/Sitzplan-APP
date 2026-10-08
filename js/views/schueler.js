@@ -1,26 +1,48 @@
 // schueler.js – Schülerinnen und Schüler einer Klasse verwalten:
 // anlegen, bearbeiten (Name, Foto, Notiz), löschen, Namensliste einfügen.
 
-import { app, aktuelleKlasse } from '../state.js';
+import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
-import { el, toast, zeigeDialog, feld, avatar, vollerName } from '../util/ui.js';
+import { el, toast, tipp, zeigeDialog, bestaetigen, feld, avatar, vollerName } from '../util/ui.js';
+import { icon } from '../util/icons.js';
+import { sitzplaetze } from '../util/raster.js';
 import { fotoVerkleinern } from '../util/foto.js';
 
 export async function zeichneSchueler(container) {
   const klasse = aktuelleKlasse();
-  const personen = await db.ladePersonen(klasse.id);
-
-  container.append(el('div', { class: 'leiste' },
-    el('button', { class: 'knopf primaer', text: '+ Person', onclick: () => personBearbeiten(null) }),
-    el('button', { class: 'knopf', text: '📋 Liste einfügen', onclick: () => listeImportieren(personen) }),
-  ));
+  const [personen, plan] = await Promise.all([
+    db.ladePersonen(klasse.id),
+    db.ladeAktuellenPlan(klasse.id),
+  ]);
 
   if (personen.length === 0) {
     container.append(el('div', { class: 'karte leer-hinweis' },
-      el('p', { text: 'Noch keine Schülerinnen und Schüler in dieser Klasse.' }),
-      el('p', { class: 'hinweis', text: 'Tipp: Mit „Liste einfügen“ legst du die ganze Klasse auf einmal an, z. B. aus einer kopierten Untis- oder Excel-Liste.' }),
+      el('div', { class: 'leer-symbol' }, icon('sus')),
+      el('h2', { text: 'Noch keine SuS' }),
+      el('p', { class: 'hinweis', text: 'Am schnellsten geht es mit einer kopierten Namensliste, z. B. aus Untis oder Excel.' }),
+      el('button', { class: 'knopf primaer breit', onclick: () => listeImportieren(personen) }, icon('liste'), 'Namensliste einfügen'),
+      el('button', { class: 'knopf breit', onclick: () => personBearbeiten(null) }, icon('plus'), 'Einzelne Person anlegen'),
     ));
     return;
+  }
+
+  container.append(el('div', { class: 'leiste fuellen' },
+    el('button', { class: 'knopf primaer', onclick: () => personBearbeiten(null) }, icon('plus'), 'Person'),
+    el('button', { class: 'knopf', onclick: () => listeImportieren(personen) }, icon('liste'), 'Liste einfügen'),
+  ));
+
+  // Nächster Schritt, solange nicht alle einen Platz haben
+  const besetzt = new Set(Object.values(plan.zuordnung));
+  const ohnePlatz = personen.filter((p) => !besetzt.has(p.id)).length;
+  const hatPlaetze = sitzplaetze(plan).length > 0;
+  if (!hatPlaetze) {
+    container.append(tipp('Im Raum sind noch keine Sitzplätze festgelegt.', 'Zum Raum',
+      () => { state.ansicht = 'raum'; app.neuZeichnen(); }));
+  } else if (ohnePlatz > 0) {
+    container.append(tipp(
+      ohnePlatz === personen.length ? 'Noch niemand hat einen Platz.' : `${ohnePlatz} SuS haben noch keinen Platz.`,
+      'Plätze zuweisen',
+      () => { state.ansicht = 'plan'; state.modus = 'bearbeiten'; app.neuZeichnen(); }));
   }
 
   container.append(
@@ -32,7 +54,8 @@ export async function zeichneSchueler(container) {
           el('strong', { text: `${p.nachname} ${p.vorname}`.trim() }),
           p.notiz ? el('small', { text: p.notiz }) : null,
         ),
-        el('span', { class: 'pfeil', text: '›' }),
+        hatPlaetze && !besetzt.has(p.id) ? el('span', { class: 'etikett', text: 'ohne Platz' }) : null,
+        el('span', { class: 'pfeil' }, icon('rechts')),
       ),
     ))),
   );
@@ -49,10 +72,17 @@ async function personBearbeiten(person) {
   const nachname = el('input', { value: daten.nachname, autocomplete: 'off', autocapitalize: 'words' });
   const notiz = el('textarea', { rows: 2, value: daten.notiz || '', placeholder: 'z. B. Brille, sitzt besser vorne …' });
 
-  // Foto-Vorschau (zeigt Initialen, solange kein Foto da ist)
+  // Foto-Vorschau (zeigt Initialen, solange kein Foto da ist).
+  // "Foto entfernen" erscheint nur, wenn es ein Foto gibt.
   const vorschau = el('div', { class: 'foto-vorschau' });
-  const zeigeVorschau = () => vorschau.replaceChildren(
-    avatar({ ...daten, vorname: vorname.value, nachname: nachname.value }));
+  const entfernen = el('button', {
+    type: 'button', class: 'knopf klein leise', text: 'Foto entfernen',
+    onclick: () => { daten.foto = null; zeigeVorschau(); },
+  });
+  const zeigeVorschau = () => {
+    vorschau.replaceChildren(avatar({ ...daten, vorname: vorname.value, nachname: nachname.value }));
+    entfernen.hidden = !daten.foto;
+  };
   zeigeVorschau();
   vorname.addEventListener('input', zeigeVorschau);
   nachname.addEventListener('input', zeigeVorschau);
@@ -76,22 +106,26 @@ async function personBearbeiten(person) {
   const fotoBereich = el('div', { class: 'foto-bereich' },
     vorschau,
     el('div', { class: 'foto-knoepfe' },
-      el('button', { type: 'button', class: 'knopf klein', text: '📷 Kamera', onclick: () => kamera.click() }),
-      el('button', { type: 'button', class: 'knopf klein', text: '🖼️ Galerie', onclick: () => galerie.click() }),
-      el('button', {
-        type: 'button', class: 'knopf klein', text: 'Foto entfernen',
-        onclick: () => { daten.foto = null; zeigeVorschau(); },
-      }),
+      el('button', { type: 'button', class: 'knopf klein', onclick: () => kamera.click() }, icon('kamera'), 'Kamera'),
+      el('button', { type: 'button', class: 'knopf klein', onclick: () => galerie.click() }, icon('bild'), 'Galerie'),
+      entfernen,
     ),
     kamera, galerie,
   );
+
+  // Von hier direkt zu den Beobachtungen der Person (schließt den Dialog mit dem Wert "verlauf").
+  // type="button", damit die Enter-Taste weiterhin "Speichern" auslöst.
+  const verlaufKnopf = person ? el('button', {
+    type: 'button', class: 'knopf',
+    onclick: (e) => e.currentTarget.closest('dialog').close('verlauf'),
+  }, icon('verlauf'), 'Beobachtungen ansehen') : null;
 
   const knoepfe = [{ text: 'Abbrechen' }, { text: 'Speichern', wert: 'ok', primaer: true }];
   if (person) knoepfe.unshift({ text: 'Löschen', wert: 'loeschen', gefahr: true });
 
   const ergebnis = await zeigeDialog({
     titel: person ? 'Person bearbeiten' : 'Neue Person',
-    inhalt: [fotoBereich, feld('Vorname', vorname), feld('Nachname', nachname), feld('Notiz (optional)', notiz)],
+    inhalt: [fotoBereich, feld('Vorname', vorname), feld('Nachname', nachname), feld('Notiz (optional)', notiz), verlaufKnopf],
     knoepfe,
   });
 
@@ -103,9 +137,18 @@ async function personBearbeiten(person) {
     toast(person ? 'Gespeichert.' : `${daten.vorname} angelegt.`);
     app.neuZeichnen();
   } else if (ergebnis === 'loeschen') {
-    if (!confirm(`${vollerName(person)} wirklich löschen?\nAlle Beobachtungen dieser Person werden ebenfalls gelöscht.`)) return;
+    if (!await bestaetigen({
+      titel: `${vollerName(person)} löschen?`,
+      text: 'Alle Beobachtungen dieser Person werden ebenfalls gelöscht.',
+      knopf: 'Löschen', gefahr: true,
+    })) return;
     await db.loeschePerson(person);
     toast('Gelöscht.');
+    app.neuZeichnen();
+  } else if (ergebnis === 'verlauf') {
+    state.personId = person.id;
+    state.zurueck = 'schueler';
+    state.ansicht = 'person';
     app.neuZeichnen();
   }
 }

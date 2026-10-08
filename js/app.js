@@ -5,6 +5,7 @@
 import { state, app, aktuelleKlasse } from './state.js';
 import * as db from './db.js';
 import { el, toast } from './util/ui.js';
+import { icon } from './util/icons.js';
 import { zeichnePlan } from './views/plan.js';
 import { zeichneRaum } from './views/raum.js';
 import { zeichneSchueler } from './views/schueler.js';
@@ -18,11 +19,11 @@ import { backupErinnerung, erinnerungVerschieben } from './util/sicherung.js';
 // Die Ansichten. "versteckt" = erscheint nicht in der unteren Navigation.
 // "breit" = darf am Laptop die ganze Breite nutzen (Tabellen).
 const ANSICHTEN = [
-  { id: 'plan', name: 'Sitzplan', symbol: '▦', zeichne: zeichnePlan },
-  { id: 'uebersicht', name: 'Übersicht', symbol: '☰', zeichne: zeichneUebersicht, breit: true },
-  { id: 'schueler', name: 'SuS', symbol: '👥', zeichne: zeichneSchueler },
-  { id: 'raum', name: 'Raum', symbol: '✎', zeichne: zeichneRaum },
-  { id: 'klasse', name: 'Mehr', symbol: '⚙︎', zeichne: zeichneKlasse },
+  { id: 'plan', name: 'Sitzplan', symbol: 'sitzplan', zeichne: zeichnePlan },
+  { id: 'uebersicht', name: 'Übersicht', symbol: 'uebersicht', zeichne: zeichneUebersicht, breit: true },
+  { id: 'schueler', name: 'SuS', symbol: 'sus', zeichne: zeichneSchueler },
+  { id: 'raum', name: 'Raum', symbol: 'raum', zeichne: zeichneRaum },
+  { id: 'klasse', name: 'Mehr', symbol: 'mehr', zeichne: zeichneKlasse },
   { id: 'person', name: 'Verlauf', zeichne: zeichnePerson, versteckt: true },
   { id: 'versionen', name: 'Versionen', zeichne: zeichneVersionen, versteckt: true },
 ];
@@ -32,6 +33,7 @@ const ANSICHTEN = [
 // Einfach und robust: nach jeder Änderung einmal alles neu.
 // ---------------------------------------------------------------------------
 let zeichenNummer = 0;
+let letzteSeite = '';   // zuletzt gezeigte Ansicht + Klasse (für die Scroll-Position)
 
 async function neuZeichnen() {
   const meineNummer = ++zeichenNummer;
@@ -55,6 +57,11 @@ async function neuZeichnen() {
   inhalt.querySelectorAll('[data-scroll]').forEach((e) => { scroll[e.dataset.scroll] = e.scrollLeft; });
   inhalt.replaceChildren(neu);
   inhalt.querySelectorAll('[data-scroll]').forEach((e) => { e.scrollLeft = scroll[e.dataset.scroll] || 0; });
+
+  // Andere Ansicht oder andere Klasse: wieder ganz oben beginnen
+  const seite = [state.ansicht, state.klasseId, state.ansicht === 'person' ? state.personId : ''].join('|');
+  if (seite !== letzteSeite) inhalt.scrollTop = 0;
+  letzteSeite = seite;
 }
 app.neuZeichnen = neuZeichnen;
 
@@ -79,7 +86,7 @@ function zeichneKopf() {
     text: k.name,
     onclick: () => klasseWechseln(k.id),
   }));
-  tabs.push(el('button', { class: 'tab plus', 'aria-label': 'Neue Klasse', text: '+', onclick: neueKlasseDialog }));
+  tabs.push(el('button', { class: 'tab plus', 'aria-label': 'Neue Klasse', title: 'Neue Klasse', onclick: neueKlasseDialog }, icon('plus')));
 
   const kopf = document.getElementById('kopf');
   kopf.replaceChildren(el('div', { class: 'kopf-zeile' },
@@ -90,7 +97,7 @@ function zeichneKopf() {
   // Erinnerung an ein Backup (unter den Tabs)
   if (state.backupFaellig) {
     kopf.append(el('div', { class: 'banner' },
-      el('span', { class: 'wachsen', text: '💾 ' + state.backupFaellig }),
+      el('span', { class: 'wachsen' }, icon('sicherung'), state.backupFaellig),
       el('button', { class: 'knopf klein primaer', text: 'Jetzt sichern', onclick: backupErstellen }),
       el('button', {
         class: 'knopf klein', text: 'Später',
@@ -113,7 +120,7 @@ function zeichneNavi() {
     class: 'navi-knopf' + (aktiv === a.id ? ' aktiv' : ''),
     'aria-current': aktiv === a.id ? 'page' : null,
     onclick: () => { state.ansicht = a.id; state.auswahl = null; neuZeichnen(); },
-  }, el('span', { class: 'navi-symbol', text: a.symbol }), el('span', { text: a.name }))));
+  }, el('span', { class: 'navi-symbol' }, icon(a.symbol)), el('span', { text: a.name }))));
 }
 
 async function klasseWechseln(id) {
@@ -127,13 +134,20 @@ async function klasseWechseln(id) {
 
 // Erster Start: noch keine Klasse vorhanden
 function zeichneWillkommen(container) {
-  container.append(el('div', { class: 'karte leer-hinweis' },
+  container.append(el('div', { class: 'karte willkommen' },
+    el('img', { class: 'logo', src: './icons/icon-192.png', alt: '' }),
     el('h2', { text: 'Willkommen!' }),
-    el('p', { text: 'Lege deine erste Klasse an. Danach legst du die Sitzplätze fest und trägst die SuS ein.' }),
-    el('button', { class: 'knopf primaer', text: '+ Erste Klasse anlegen', onclick: neueKlasseDialog }),
+    el('p', { class: 'hinweis', text: 'In drei Schritten zu deinem ersten Sitzplan:' }),
+    el('ol', { class: 'schritte' },
+      el('li', { text: 'Klasse anlegen' }),
+      el('li', { text: 'Sitzplätze im Raum festlegen' }),
+      el('li', { text: 'SuS eintragen und auf die Plätze setzen' }),
+    ),
+    el('button', { class: 'knopf primaer breit', onclick: neueKlasseDialog }, icon('plus'), 'Erste Klasse anlegen'),
     el('p', { class: 'hinweis', text: 'Alle Daten bleiben ausschließlich auf diesem Gerät.' }),
-    el('p', { class: 'hinweis', text: 'Schon Daten auf einem anderen Gerät? Dort unter „Mehr“ ein Backup erstellen und hier einspielen:' }),
-    el('button', { class: 'knopf', text: '⬆︎ Backup einspielen', onclick: backupEinspielen }),
+    el('div', { class: 'trenner' }),
+    el('p', { class: 'hinweis', text: 'Schon Daten auf einem anderen Gerät? Dort unter „Mehr“ ein Backup erstellen und hier einspielen.' }),
+    el('button', { class: 'knopf breit', onclick: backupEinspielen }, icon('hinauf'), 'Backup einspielen'),
   ));
 }
 

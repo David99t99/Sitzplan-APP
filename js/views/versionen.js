@@ -2,8 +2,9 @@
 
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
-import { el, toast, zeigeDialog, feld, kurznamen } from '../util/ui.js';
-import { feldKey, belegterBereich, anzeigeReihenfolge, FELDTYPEN } from '../util/raster.js';
+import { el, toast, zeigeDialog, bestaetigen, feld, kurznamen } from '../util/ui.js';
+import { icon } from '../util/icons.js';
+import { feldKey, belegterBereich, anzeigeReihenfolge } from '../util/raster.js';
 import { datumText } from '../util/beobachtung.js';
 
 export async function zeichneVersionen(container) {
@@ -18,18 +19,18 @@ export async function zeichneVersionen(container) {
   container.append(
     el('div', { class: 'leiste' },
       el('button', {
-        class: 'knopf klein', text: '‹ Zurück',
+        class: 'knopf klein',
         onclick: () => { state.ansicht = 'plan'; state.versionId = null; app.neuZeichnen(); },
-      }),
+      }, icon('links'), 'Zurück'),
       el('h2', { class: 'wachsen', text: 'Frühere Sitzordnungen' }),
     ),
-    el('div', { class: 'leiste' },
+    el('div', { class: 'leiste fuellen' },
       el('button', {
-        class: 'knopf primaer', text: '💾 Aktuelle Sitzordnung speichern',
+        class: 'knopf primaer',
         onclick: async () => {
           if (await versionSpeichernDialog()) app.neuZeichnen();
         },
-      }),
+      }, icon('merken'), 'Aktuelle Sitzordnung speichern'),
     ),
   );
 
@@ -52,15 +53,19 @@ export async function zeichneVersionen(container) {
           el('strong', { text: datumText(v.datum) }),
           el('small', { text: (v.bezeichnung ? v.bezeichnung + ' · ' : '') + `${anzahl} SuS` }),
         ),
-        el('span', { class: 'pfeil', text: offen ? '▾' : '›' }),
+        el('span', { class: 'pfeil' }, icon(offen ? 'unten' : 'rechts')),
       ),
       offen ? el('div', { class: 'version-details' },
         vorschau(v, personNachId, namen),
-        el('div', { class: 'leiste' },
+        el('div', { class: 'leiste fuellen' },
           el('button', {
             class: 'knopf primaer', text: 'Wiederherstellen',
             onclick: async () => {
-              if (!confirm('Diese Sitzordnung wiederherstellen?\nDie aktuelle wird vorher automatisch als Version gespeichert.')) return;
+              if (!await bestaetigen({
+                titel: 'Sitzordnung wiederherstellen?',
+                text: 'Die aktuelle Sitzordnung wird vorher automatisch als Version gespeichert.',
+                knopf: 'Wiederherstellen',
+              })) return;
               await db.stelleVersionWiederHer(v);
               state.versionId = null;
               state.ansicht = 'plan';
@@ -71,7 +76,7 @@ export async function zeichneVersionen(container) {
           el('button', {
             class: 'knopf gefahr-leise', text: 'Löschen',
             onclick: async () => {
-              if (!confirm('Diese Version löschen?')) return;
+              if (!await bestaetigen({ titel: 'Diese Version löschen?', knopf: 'Löschen', gefahr: true })) return;
               await db.loescheVersion(v.id);
               state.versionId = null;
               app.neuZeichnen();
@@ -117,7 +122,7 @@ function vorschau(plan, personNachId, namen) {
       const person = personNachId.get(plan.zuordnung[key]);
       raster.append(el('div', {
         class: 'zelle ' + (typ || 'leer') + (person ? ' besetzt' : ''),
-        text: person ? namen.get(person.id) : (typ && typ !== 'sitz' ? FELDTYPEN[typ].symbol : ''),
+        text: person ? namen.get(person.id) : '',
       }));
     }
   }

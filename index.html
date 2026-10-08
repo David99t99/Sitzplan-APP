@@ -8,7 +8,9 @@
 
   <!-- PWA: Manifest + Farben -->
   <link rel="manifest" href="./manifest.webmanifest">
-  <meta name="theme-color" content="#2563eb">
+  <!-- Farbe der Statusleiste = Farbe der Kopfleiste (hell / dunkel, siehe --flaeche in app.css) -->
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1a1d23">
 
   <!-- iPhone: Homescreen-App ohne Safari-Leisten -->
   <meta name="apple-mobile-web-app-capable" content="yes">

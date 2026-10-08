@@ -4,7 +4,8 @@
 
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
-import { el, toast, zeigeDialog, feld } from '../util/ui.js';
+import { el, toast, zeigeDialog, bestaetigen, feld, kartenKopf } from '../util/ui.js';
+import { icon } from '../util/icons.js';
 import { datumText } from '../util/beobachtung.js';
 import { backupExportieren, backupPruefen, backupErinnerung } from '../util/sicherung.js';
 import { dateiWaehlen } from '../util/datei.js';
@@ -25,14 +26,14 @@ export async function zeichneKlasse(container) {
       app.neuZeichnen(); // Tab-Name aktualisieren
     },
   },
-    el('h2', { text: `Klasse „${klasse.name}“` }),
+    kartenKopf('klasse', 'Angaben zur Klasse'),
     f.elemente,
     el('button', { class: 'knopf primaer', type: 'submit', text: 'Speichern' }),
     // Reihenfolge der Tabs oben
     state.klassen.length > 1 ? el('div', { class: 'leiste' },
       el('span', { class: 'hinweis wachsen', text: 'Position in der Leiste oben' }),
-      el('button', { type: 'button', class: 'knopf rund', 'aria-label': 'nach links', text: '◀', onclick: () => verschieben(-1) }),
-      el('button', { type: 'button', class: 'knopf rund', 'aria-label': 'nach rechts', text: '▶', onclick: () => verschieben(1) }),
+      el('button', { type: 'button', class: 'knopf rund', 'aria-label': 'nach links', onclick: () => verschieben(-1) }, icon('links')),
+      el('button', { type: 'button', class: 'knopf rund', 'aria-label': 'nach rechts', onclick: () => verschieben(1) }, icon('rechts')),
     ) : null,
   );
 
@@ -43,12 +44,16 @@ export async function zeichneKlasse(container) {
   }
 
   const loeschen = el('div', { class: 'karte' },
-    el('h2', { text: 'Klasse löschen' }),
+    kartenKopf('papierkorb', 'Klasse löschen', true),
     el('p', { class: 'hinweis', text: 'Löscht die Klasse mit allen SuS, Fotos, Sitzplänen und Beobachtungen. Das lässt sich nicht rückgängig machen.' }),
     el('button', {
-      class: 'knopf gefahr', text: `„${klasse.name}“ löschen`,
+      class: 'knopf gefahr-leise', text: `„${klasse.name}“ löschen`,
       onclick: async () => {
-        if (!confirm(`„${klasse.name}“ mit allen SuS und Daten endgültig löschen?`)) return;
+        if (!await bestaetigen({
+          titel: `„${klasse.name}“ löschen?`,
+          text: 'Die Klasse wird mit allen SuS, Fotos, Sitzplänen und Beobachtungen endgültig gelöscht.',
+          knopf: 'Endgültig löschen', gefahr: true,
+        })) return;
         await db.loescheKlasse(klasse.id);
         state.klassen = await db.ladeKlassen();
         state.klasseId = state.klassen[0]?.id ?? null;
@@ -60,13 +65,17 @@ export async function zeichneKlasse(container) {
     }),
   );
 
+  // Oben, was nur DIESE Klasse betrifft – darunter, was für die ganze App gilt
   container.append(
+    el('h3', { class: 'abschnitt-titel', text: `Klasse „${klasse.name}“` }),
     formular,
+    el('h3', { class: 'abschnitt-titel', text: 'Für alle Klassen' }),
     await sicherungKarte(),
-    await pinKarte(app.neuZeichnen),
     await schnellbuttonsKarte(),
-    loeschen,
+    await pinKarte(app.neuZeichnen),
     await speicherInfo(),
+    el('h3', { class: 'abschnitt-titel', text: 'Gefahrenbereich' }),
+    loeschen,
   );
 }
 
@@ -85,12 +94,14 @@ async function sicherungKarte() {
   intervall.value = String(await db.ladeEinstellung('backupIntervall', 30));
 
   return el('div', { class: 'karte' },
-    el('h2', { text: 'Datensicherung' }),
-    el('p', { class: 'hinweis', text: letztes ? `Letztes Backup: ${datumText(letztes)}` : 'Noch kein Backup erstellt.' }),
+    kartenKopf('sicherung', 'Datensicherung'),
+    letztes
+      ? el('p', { class: 'status gut' }, icon('haken'), `Letztes Backup: ${datumText(letztes)}`)
+      : el('p', { class: 'status warnung', text: 'Noch kein Backup erstellt.' }),
     el('p', { class: 'hinweis', text: 'Das Backup ist eine Datei mit allen Klassen, SuS, Fotos, Sitzplänen und Beobachtungen. Damit überträgst du auch die Daten zwischen iPhone und Laptop. Die Datei enthält Schülerdaten – sicher aufbewahren.' }),
-    el('div', { class: 'leiste' },
-      el('button', { class: 'knopf primaer', text: '⬇︎ Backup erstellen', onclick: backupErstellen }),
-      el('button', { class: 'knopf', text: '⬆︎ Backup einspielen', onclick: backupEinspielen }),
+    el('div', { class: 'leiste fuellen' },
+      el('button', { class: 'knopf primaer', onclick: backupErstellen }, icon('herunter'), 'Backup erstellen'),
+      el('button', { class: 'knopf', onclick: backupEinspielen }, icon('hinauf'), 'Backup einspielen'),
     ),
     feld('Erinnerung an ein Backup', intervall),
   );
@@ -119,9 +130,9 @@ export async function backupEinspielen() {
     inhalt: [
       el('p', { text: `Backup vom ${backup.erstellt ? datumText(backup.erstellt) : '?'}:` }),
       el('p', {}, el('strong', { text: backup.zusammenfassung })),
-      el('p', { class: 'hinweis-warnung', text: '⚠︎ Alle Klassen, SuS und Beobachtungen auf DIESEM Gerät werden durch das Backup ersetzt. Erstelle vorher ein Backup, falls du hier etwas Neueres hast.' }),
+      el('p', { class: 'hinweis-warnung', text: 'Alle Klassen, SuS und Beobachtungen auf DIESEM Gerät werden durch das Backup ersetzt. Erstelle vorher ein Backup, falls du hier etwas Neueres hast.' }),
     ],
-    knoepfe: [{ text: 'Abbrechen' }, { text: 'Ersetzen', wert: 'ok', primaer: true }],
+    knoepfe: [{ text: 'Abbrechen' }, { text: 'Ersetzen', wert: 'ok', primaer: true, gefahr: true }],
   });
   if (ergebnis !== 'ok') return;
   await db.alleDatenErsetzen(backup.daten);
@@ -140,20 +151,24 @@ async function schnellbuttonsKarte() {
     el('option', { value: '0', text: '• neutral' }));
 
   return el('div', { class: 'karte' },
-    el('h2', { text: 'Schnellbuttons' }),
-    el('p', { class: 'hinweis', text: 'Zusätzliche Knöpfe im Schnellmenü. Gelten für alle Klassen. Bereits erfasste Einträge bleiben beim Entfernen erhalten.' }),
+    kartenKopf('blitz', 'Schnellbuttons'),
+    el('p', { class: 'hinweis', text: 'Zusätzliche Knöpfe im Schnellmenü, das sich im Unterricht beim Antippen einer Person öffnet. Bereits erfasste Einträge bleiben beim Entfernen erhalten.' }),
     el('ul', { class: 'liste' }, liste.filter((s) => !s.geloescht).map((s) => el('li', { class: 'sb-eintrag' },
       el('span', { class: 'eintrag-zeichen ' + (s.wert > 0 ? 'positiv' : s.wert < 0 ? 'negativ' : 'neutral'), text: zeichen[s.wert] }),
       el('span', { class: 'wachsen', text: s.name }),
       el('button', {
-        class: 'knopf rund', 'aria-label': s.name + ' entfernen', text: '✕',
+        class: 'knopf rund', 'aria-label': s.name + ' entfernen',
         onclick: async () => {
-          if (!confirm(`Schnellbutton „${s.name}“ entfernen?`)) return;
+          if (!await bestaetigen({
+            titel: `„${s.name}“ entfernen?`,
+            text: 'Bereits erfasste Einträge bleiben erhalten.',
+            knopf: 'Entfernen', gefahr: true,
+          })) return;
           s.geloescht = true; // nur ausblenden, damit alte Einträge ihren Namen behalten
           await db.speichereSchnellbuttons(liste);
           app.neuZeichnen();
         },
-      }),
+      }, icon('x')),
     ))),
     el('form', {
       class: 'sb-neu',
@@ -166,7 +181,7 @@ async function schnellbuttonsKarte() {
         toast(`„${n}“ hinzugefügt.`);
         app.neuZeichnen();
       },
-    }, name, wert, el('button', { class: 'knopf', type: 'submit', text: 'Hinzufügen' })),
+    }, name, wert, el('button', { class: 'knopf', type: 'submit' }, icon('plus'), 'Hinzufügen')),
   );
 }
 
@@ -206,8 +221,10 @@ function klassenFelder(k) {
     elemente: [
       feld('Name', name),
       feld('Fach (optional)', fach),
-      feld('Raum (optional)', raum),
-      feld('Schuljahr (optional)', schuljahr),
+      el('div', { class: 'feld-reihe' },
+        feld('Raum (optional)', raum),
+        feld('Schuljahr (optional)', schuljahr),
+      ),
     ],
     werte: () => ({
       name: name.value.trim(),
@@ -233,8 +250,10 @@ async function speicherInfo() {
     belegt = ` · belegt ca. ${(usage / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
   }
   return el('div', { class: 'karte' },
-    el('h2', { text: 'Speicher' }),
+    kartenKopf('speicher', 'Speicher'),
     el('p', { class: 'hinweis', text: 'Alle Daten liegen nur auf diesem Gerät. Nichts wird ins Internet übertragen.' }),
-    el('p', { class: 'hinweis', text: (dauerhaft ? '✓ Dauerhafte Speicherung aktiv' : '⚠︎ Dauerhafte Speicherung nicht bestätigt') + belegt }),
+    dauerhaft
+      ? el('p', { class: 'status gut' }, icon('haken'), 'Dauerhafte Speicherung aktiv' + belegt)
+      : el('p', { class: 'status warnung', text: 'Dauerhafte Speicherung nicht bestätigt' + belegt }),
   );
 }

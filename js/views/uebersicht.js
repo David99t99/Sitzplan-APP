@@ -4,7 +4,8 @@
 
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
-import { el, avatar } from '../util/ui.js';
+import { el, tipp, avatar } from '../util/ui.js';
+import { icon } from '../util/icons.js';
 import { zeitraumGrenzen, summen, summeText, ZEITRAEUME } from '../util/beobachtung.js';
 import { csvEintraege, csvUebersicht } from '../util/sicherung.js';
 import { filterLeiste } from './person.js';
@@ -22,7 +23,8 @@ export async function zeichneUebersicht(container) {
   container.append(filterLeiste());
 
   if (personen.length === 0) {
-    container.append(el('p', { class: 'hinweis', text: 'Noch keine SuS in dieser Klasse.' }));
+    container.append(tipp('Noch keine SuS in dieser Klasse.', 'SuS eintragen',
+      () => { state.ansicht = 'schueler'; app.neuZeichnen(); }));
     return;
   }
 
@@ -109,9 +111,9 @@ export async function zeichneUebersicht(container) {
     el('div', { class: 'tabelle-huelle', dataset: { scroll: 'uebersicht' } },
       el('table', { class: 'tabelle' }, thead, tbody)),
     el('p', { class: 'hinweis', text: 'Spaltenkopf antippen = sortieren · Zeile antippen = Verlauf' }),
-    el('div', { class: 'leiste' },
+    el('div', { class: 'leiste fuellen' },
       el('button', {
-        class: 'knopf klein', text: '⬇︎ Übersicht als CSV',
+        class: 'knopf klein',
         onclick: () => csvUebersicht(klasse,
           ['Nachname', 'Vorname', 'Mitarbeit +', 'Mitarbeit −', 'Mitarbeit Summe',
             'Verhalten +', 'Verhalten −', 'Verhalten Summe', ...buttons.map((sb) => sb.name), 'Notizen',
@@ -120,11 +122,11 @@ export async function zeichneUebersicht(container) {
             w['mitarbeit-plus'], w['mitarbeit-minus'], w['mitarbeit-summe'],
             w['verhalten-plus'], w['verhalten-minus'], w['verhalten-summe'],
             ...buttons.map((sb) => w['sb-' + sb.id]), w.notiz, zeitraumName()])),
-      }),
+      }, icon('herunter'), 'Übersicht als CSV'),
       el('button', {
-        class: 'knopf klein', text: '⬇︎ Alle Einträge als CSV',
+        class: 'knopf klein',
         onclick: () => csvEintraege(klasse, beobachtungen, personen, alleButtons),
-      }),
+      }, icon('herunter'), 'Alle Einträge als CSV'),
     ),
   );
 }

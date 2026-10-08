@@ -7,12 +7,12 @@
 export const feldKey = (zeile, spalte) => `${zeile}-${spalte}`;
 export const ausKey = (key) => key.split('-').map(Number);
 
-// Die Feldtypen mit Beschriftung für den Editor
+// Die Feldtypen mit Beschriftung. "kurz" passt auch in ein einzelnes Feld.
 export const FELDTYPEN = {
-  sitz: { name: 'Sitzplatz', symbol: '🪑' },
-  pult: { name: 'Lehrertisch', symbol: '🧑‍🏫' },
-  tafel: { name: 'Tafel', symbol: '' },
-  tuer: { name: 'Tür', symbol: '🚪' },
+  sitz: { name: 'Sitzplatz', kurz: '' },
+  pult: { name: 'Lehrertisch', kurz: 'Pult' },
+  tafel: { name: 'Tafel', kurz: 'Tafel' },
+  tuer: { name: 'Tür', kurz: 'Tür' },
 };
 
 // Liefert die Zeilen- und Spaltennummern in der Reihenfolge, in der sie

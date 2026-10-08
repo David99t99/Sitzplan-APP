@@ -8,12 +8,17 @@
 // Zuweisen geht auf zwei Arten:
 //   a) Ziehen: Person mit dem Finger auf einen Platz ziehen
 //   b) Antippen: erst Person antippen (wird markiert), dann den Platz
+//
+// Damit der Raum auch am Handy ganz auf den Bildschirm passt, werden leere
+// Spalten und Zeilen (Gänge) schmal gezeichnet. Nebeneinander liegende Tafel-
+// oder Lehrertisch-Felder verschmelzen zu einem beschrifteten Block.
 
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
-import { el, toast, avatar, kurznamen, zeigeDialog } from '../util/ui.js';
+import { el, toast, tipp, avatar, kurznamen, vollerName, zeigeDialog } from '../util/ui.js';
+import { icon } from '../util/icons.js';
 import {
-  FELDTYPEN, feldKey, belegterBereich, anzeigeReihenfolge,
+  FELDTYPEN, feldKey, belegterBereich, anzeigeReihenfolge, sitzplaetze,
   platzieren, freigeben, aufraeumen, zufaelligVerteilen,
 } from '../util/raster.js';
 import { ziehbarMachen, warGeradeGezogen } from '../util/ziehen.js';
@@ -21,7 +26,9 @@ import { zeitraumGrenzen } from '../util/beobachtung.js';
 import { oeffneSchnellmenue } from './schnellmenue.js';
 import { versionSpeichernDialog } from './versionen.js';
 
-const LUECKE = 4; // Abstand zwischen den Feldern in px (muss zu --luecke in app.css passen)
+const LUECKE = 5;    // Abstand zwischen den Feldern in px (muss zu --luecke in app.css passen)
+const GANG = 0.35;   // Gang (Spalte/Zeile ohne Plätze): so viel von einem normalen Feld
+const FLACH = 0.6;   // Spalte/Zeile, in der nur Tafel oder Tür liegen
 
 export async function zeichnePlan(container) {
   const klasse = aktuelleKlasse();
@@ -45,70 +52,118 @@ export async function zeichnePlan(container) {
   aufraeumen(plan, new Set(personNachId.keys()));
   if (Object.keys(plan.zuordnung).length !== vorher) await db.speicherePlan(plan);
 
-  // ---------- Kopfleiste: Modus + Sicht ----------
-  container.append(
-    el('div', { class: 'leiste' },
-      el('div', { class: 'umschalter', role: 'group', 'aria-label': 'Modus' },
-        modusKnopf('unterricht', '🔒 Unterricht'),
-        modusKnopf('bearbeiten', '✏️ Bearbeiten'),
-      ),
-      sichtKnopf(),
-    ),
-  );
-
-  // Kleine Infozeile (Fach · Raum)
-  const info = [klasse.fach, klasse.raum && `Raum ${klasse.raum}`].filter(Boolean).join(' · ');
-  if (info) container.append(el('p', { class: 'unterzeile', text: info }));
-
-  // ---------- Noch keine Sitzplätze? ----------
+  // ---------- Noch keine Sitzplätze? Dann nur den nächsten Schritt zeigen ----------
   const bereich = belegterBereich(plan);
-  if (!bereich) {
+  if (!bereich || sitzplaetze(plan).length === 0) {
     container.append(el('div', { class: 'karte leer-hinweis' },
-      el('p', { text: 'Für diese Klasse sind noch keine Sitzplätze festgelegt.' }),
+      el('div', { class: 'leer-symbol' }, icon('raum')),
+      el('h2', { text: 'Noch keine Sitzplätze' }),
+      el('p', { class: 'hinweis', text: 'Lege zuerst fest, wo in diesem Raum Sitzplätze, Tafel und Tür sind.' }),
       el('button', {
-        class: 'knopf primaer', text: 'Sitzplätze festlegen',
+        class: 'knopf primaer',
         onclick: () => { state.ansicht = 'raum'; app.neuZeichnen(); },
-      }),
+      }, 'Sitzplätze festlegen'),
     ));
     return;
   }
 
+  const besetzt = new Set(Object.values(plan.zuordnung));
+  const ohnePlatz = personen.filter((p) => !besetzt.has(p.id));
+  const gewaehlt = bearbeiten ? personNachId.get(state.auswahl) : null;
+
+  // ---------- Kopfleiste: Modus ----------
+  // Zeile darunter: links Fach · Raum (Unterricht) bzw. die Anleitung (Bearbeiten),
+  // rechts "Ansicht drehen". Gleiche Höhe in beiden Modi, damit das Raster nicht springt.
+  let info = [klasse.fach, klasse.raum && `Raum ${klasse.raum}`].filter(Boolean).join(' · ');
+  if (gewaehlt) info = `${namen.get(gewaehlt.id)} ist markiert – jetzt den Platz antippen.`;
+  else if (bearbeiten) info = 'Person ziehen – oder antippen und dann den Platz antippen.';
+  container.append(el('div', { class: 'plan-kopf' },
+    el('div', { class: 'umschalter', role: 'group', 'aria-label': 'Modus' },
+      modusKnopf('unterricht', 'unterricht', 'Unterricht'),
+      modusKnopf('bearbeiten', 'stift', 'Bearbeiten'),
+    ),
+    el('div', { class: 'plan-info' },
+      el('p', { class: 'unterzeile wachsen' + (gewaehlt ? ' akzent' : ''), text: info }),
+      sichtKnopf(),
+    ),
+  ));
+
   // ---------- Das Raster ----------
   const zeilen = anzeigeReihenfolge(bereich.zMin, bereich.zMax, state.lehrersicht);
   const spalten = anzeigeReihenfolge(bereich.sMin, bereich.sMax, state.lehrersicht);
-  const raster = el('div', {
-    class: 'raster' + (bearbeiten ? ' bearbeiten' : ''),
-    style: { '--spalten': spalten.length, '--zelle': zellGroesse(spalten.length, 44, 110, zeilen.length) + 'px' },
+  // Größe jeder Spalte/Zeile als Faktor: volle Größe brauchen nur Sitzplätze und Lehrertisch.
+  // Eine Tafel, die quer über einen Gang reicht, macht den Gang NICHT breiter.
+  const braucht = (typen) => typen.some((t) => t === 'sitz' || t === 'pult');
+  const spaltenSpuren = spalten.map((s) => {
+    const typen = zeilen.map((z) => plan.felder[feldKey(z, s)]);
+    return braucht(typen) ? 1 : typen.includes('tuer') ? FLACH : GANG;
   });
-  for (const z of zeilen) {
-    for (const s of spalten) raster.append(zelle(feldKey(z, s)));
-  }
+  const zeilenSpuren = zeilen.map((z) => {
+    const typen = spalten.map((s) => plan.felder[feldKey(z, s)]);
+    return braucht(typen) ? 1 : typen.some(Boolean) ? FLACH : GANG;
+  });
+  const spuren = (liste) => liste.map((f) => (f === 1 ? 'var(--zelle)' : `calc(var(--zelle) * ${f})`)).join(' ');
+
+  const raster = el('div', {
+    class: 'raster plan' + (bearbeiten ? ' bearbeiten' : '') + (gewaehlt ? ' waehlt' : ''),
+    style: {
+      '--zelle': zellGroesse({
+        spalten: spaltenSpuren, zeilen: zeilenSpuren, min: 44, max: 110,
+        reserve: bearbeiten ? 330 : 140, // Platz für Umschalter, Infozeile (+ Aktionen und Leiste)
+      }) + 'px',
+      'grid-template-columns': spuren(spaltenSpuren),
+      'grid-template-rows': spuren(zeilenSpuren),
+    },
+  });
+  zeilen.forEach((z, zi) => {
+    for (let si = 0; si < spalten.length; si++) {
+      const key = feldKey(z, spalten[si]);
+      const typ = plan.felder[key];
+      if (!typ) continue;
+      // Tafel/Lehrertisch/Tür: gleiche Felder nebeneinander zu EINEM Block zusammenfassen
+      let breite = 1;
+      if (typ !== 'sitz') {
+        while (plan.felder[feldKey(z, spalten[si + breite])] === typ) breite++;
+      }
+      const feld = typ === 'sitz' ? sitz(key) : moebel(typ, breite);
+      feld.style.gridRow = String(zi + 1);
+      feld.style.gridColumn = `${si + 1} / span ${breite}`;
+      raster.append(feld);
+      si += breite - 1;
+    }
+  });
   container.append(el('div', { class: 'raster-huelle', dataset: { scroll: 'plan' } }, raster));
 
-  // ---------- Bearbeitungsmodus: Hinweis, Zufall, Leiste "Ohne Platz" ----------
-  const besetzt = new Set(Object.values(plan.zuordnung));
-  const ohnePlatz = personen.filter((p) => !besetzt.has(p.id));
-
+  // ---------- Unter dem Raster ----------
   if (bearbeiten) {
+    const aktion = (symbol, text, onclick) =>
+      el('button', { class: 'werkzeug', onclick }, icon(symbol), el('span', { text }));
     container.append(
-      el('p', {
-        class: 'hinweis',
-        text: 'Person ziehen – oder antippen und dann den Platz antippen. Auf einen besetzten Platz = tauschen.',
-      }),
-      el('div', { class: 'leiste' },
-        el('button', { class: 'knopf', text: '🎲 Zufällig verteilen', onclick: zufall }),
-        el('button', { class: 'knopf', text: '💾 Version speichern', onclick: versionSpeichernDialog }),
-        el('button', {
-          class: 'knopf', text: '🕘 Versionen',
-          onclick: () => { state.ansicht = 'versionen'; state.auswahl = null; app.neuZeichnen(); },
-        }),
+      el('div', { class: 'werkzeuge drei' },
+        aktion('wuerfel', 'Zufällig verteilen', zufall),
+        aktion('merken', 'Version speichern', versionSpeichernDialog),
+        aktion('verlauf', 'Versionen', () => { state.ansicht = 'versionen'; state.auswahl = null; app.neuZeichnen(); }),
       ),
       leisteOhnePlatz(),
     );
-  } else if (ohnePlatz.length > 0) {
+    return;
+  }
+
+  // Unterricht: Wenn noch etwas fehlt, den nächsten Schritt anbieten
+  if (personen.length === 0) {
+    container.append(tipp('Noch keine SuS in dieser Klasse.', 'SuS eintragen',
+      () => { state.ansicht = 'schueler'; app.neuZeichnen(); }));
+  } else if (besetzt.size === 0) {
+    container.append(tipp('Noch niemand hat einen Platz.', 'Plätze zuweisen',
+      () => { state.modus = 'bearbeiten'; app.neuZeichnen(); }));
+  } else if (heuteAlle.length === 0) {
+    container.append(el('p', { class: 'unterzeile', text: 'Person antippen, um Mitarbeit oder Verhalten einzutragen.' }));
+  }
+
+  if (ohnePlatz.length > 0) {
     // Auch SuS ohne Platz sollen im Unterricht Einträge bekommen können
     container.append(el('section', { class: 'ohne-platz' },
-      el('h3', { text: `Ohne Platz (${ohnePlatz.length})` }),
+      el('div', { class: 'ohne-platz-kopf' }, el('h3', { text: `Ohne Platz (${ohnePlatz.length})` })),
       el('div', { class: 'chips' }, ohnePlatz.map((p) => el('button', {
         class: 'chip',
         onclick: () => oeffneSchnellmenue(p, heute.get(p.id)),
@@ -118,12 +173,8 @@ export async function zeichnePlan(container) {
 
   // ======================= Hilfsfunktionen ==================================
 
-  // Ein Feld des Rasters
-  function zelle(key) {
-    const typ = plan.felder[key];
-    if (!typ) return el('div', { class: 'zelle leer' });
-    if (typ !== 'sitz') return el('div', { class: 'zelle ' + typ, text: FELDTYPEN[typ].symbol });
-
+  // Ein Sitzplatz (frei oder besetzt)
+  function sitz(key) {
     const person = personNachId.get(plan.zuordnung[key]);
     const feld = el('div', {
       class: 'zelle sitz'
@@ -132,12 +183,30 @@ export async function zeichnePlan(container) {
       dataset: { ziel: 'sitz', key },
       onclick: () => sitzAntippen(key),
     });
-    if (person) {
-      feld.append(avatar(person), el('span', { class: 'name', text: namen.get(person.id) }));
-      if (!bearbeiten) feld.append(marken(person.id));
-      if (bearbeiten) ziehbarMachen(feld, { onDrop: (ziel) => fallenLassen(person.id, ziel) });
+    if (!person) return feld;
+
+    feld.append(avatar(person), el('span', { class: 'name', text: namen.get(person.id) }));
+    if (bearbeiten) {
+      ziehbarMachen(feld, { onDrop: (ziel) => fallenLassen(person.id, ziel) });
+    } else {
+      const zaehler = marken(person.id);
+      if (zaehler) feld.append(zaehler);
+      // Am Laptop auch mit Tab + Enter erreichbar
+      feld.setAttribute('role', 'button');
+      feld.setAttribute('tabindex', '0');
+      feld.setAttribute('aria-label', vollerName(person));
+      feld.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sitzAntippen(key); }
+      });
     }
     return feld;
+  }
+
+  // Tafel, Lehrertisch oder Tür ("breite" = Anzahl der zusammengefassten Felder)
+  function moebel(typ, breite) {
+    if (typ === 'tuer') return el('div', { class: 'zelle tuer', title: FELDTYPEN.tuer.name }, icon('tuer'));
+    const text = breite > 1 ? FELDTYPEN[typ].name : FELDTYPEN[typ].kurz;
+    return el('div', { class: 'zelle ' + typ }, el('span', { class: 'moebel-text', text }));
   }
 
   async function sitzAntippen(key) {
@@ -171,40 +240,52 @@ export async function zeichnePlan(container) {
     app.neuZeichnen();
   }
 
+  // Bearbeiten: die Leiste "Ohne Platz". Sie bleibt unten am Bildschirm stehen.
   function leisteOhnePlatz() {
+    // Ist eine SITZENDE Person markiert, wird die Leiste zur Ablage "vom Platz nehmen"
+    const ablage = gewaehlt && besetzt.has(gewaehlt.id);
     let inhalt;
     if (ohnePlatz.length > 0) {
-      inhalt = el('div', { class: 'chips' }, ohnePlatz.map(chip));
-    } else {
-      inhalt = el('p', {
-        class: 'hinweis',
-        text: personen.length ? 'Alle haben einen Platz. ✓' : 'Noch keine SuS – lege sie unter „SuS“ an.',
-      });
+      inhalt = el('div', { class: 'chips reihe', dataset: { scroll: 'ohne-platz' } }, ohnePlatz.map(chip));
+    } else if (personen.length === 0) {
+      inhalt = tipp('Noch keine SuS in dieser Klasse.', 'SuS eintragen',
+        () => { state.ansicht = 'schueler'; app.neuZeichnen(); });
+    } else if (!ablage) {
+      inhalt = el('p', { class: 'hinweis', text: 'Alle haben einen Platz. Zum Entfernen eine Person hierher ziehen.' });
     }
     return el('section', {
-      class: 'ohne-platz',
+      class: 'ohne-platz haftend' + (ablage ? ' ablage' : ''),
       dataset: { ziel: 'leiste' },
       // Antippen der Leiste, während eine sitzende Person markiert ist: Person vom Platz nehmen
       onclick: async () => {
-        if (warGeradeGezogen() || !state.auswahl || !besetzt.has(state.auswahl)) return;
+        if (warGeradeGezogen() || !ablage) return;
         freigeben(plan, state.auswahl);
         state.auswahl = null;
         await db.speicherePlan(plan);
         app.neuZeichnen();
       },
-    }, el('h3', { text: `Ohne Platz (${ohnePlatz.length})` }), inhalt);
+    },
+      el('div', { class: 'ohne-platz-kopf' },
+        el('h3', { text: `Ohne Platz (${ohnePlatz.length})` }),
+        ablage ? el('span', { class: 'hinweis', text: `Hier antippen: ${namen.get(gewaehlt.id)} vom Platz nehmen` }) : null,
+      ),
+      inhalt,
+    );
   }
 
-  // Kleine Zähler für heute: grün = positive, rot = negative Einträge, Punkt = Notiz
+  // Kleine Zähler für heute: links rot = negative, rechts grün = positive Einträge, Punkt = Notiz
   function marken(personId) {
     const liste = heute.get(personId) || [];
     const plus = liste.filter((b) => b.wert > 0).length;
     const minus = liste.filter((b) => b.wert < 0).length;
     const notiz = liste.some((b) => b.wert === 0);
+    if (!plus && !minus && !notiz) return null;
     return el('span', { class: 'marken', 'aria-label': `heute ${plus} plus, ${minus} minus` },
-      plus ? el('span', { class: 'marke positiv', text: '+' + plus }) : null,
-      minus ? el('span', { class: 'marke negativ', text: '−' + minus }) : null,
-      notiz ? el('span', { class: 'marke neutral', text: '•' }) : null,
+      el('span', { class: 'marken-seite' },
+        minus ? el('span', { class: 'marke negativ', text: '−' + minus }) : null),
+      el('span', { class: 'marken-seite rechts' },
+        plus ? el('span', { class: 'marke positiv', text: '+' + plus }) : null,
+        notiz ? el('span', { class: 'marke neutral', title: 'Notiz' }) : null),
     );
   }
 
@@ -245,40 +326,40 @@ export async function zeichnePlan(container) {
 }
 
 // Knopf im Umschalter Unterricht/Bearbeiten
-function modusKnopf(modus, text) {
+function modusKnopf(modus, symbol, text) {
   return el('button', {
-    class: 'umschalter-knopf' + (state.modus === modus ? ' aktiv' : ''),
+    class: 'umschalter-knopf ' + modus + (state.modus === modus ? ' aktiv' : ''),
     'aria-pressed': String(state.modus === modus),
-    text,
     onclick: () => { state.modus = modus; state.auswahl = null; app.neuZeichnen(); },
-  });
+  }, icon(symbol), text);
 }
 
 // Umschalten Lehrersicht (Tafel unten) / Schülersicht (Tafel oben).
-// Wird auch im Raum-Editor verwendet.
-export function sichtKnopf() {
+// Wird auch im Raum-Editor verwendet (dort nur als Symbol, die Beschriftung steht darüber).
+export function sichtKnopf(nurSymbol = false) {
   return el('button', {
-    class: 'knopf klein',
-    title: 'Ansicht drehen',
-    text: state.lehrersicht ? '⇅ Lehrer' : '⇅ Schüler',
+    class: nurSymbol ? 'knopf rund' : 'knopf klein leise',
+    title: 'Ansicht um 180° drehen',
+    'aria-label': nurSymbol ? 'Ansicht um 180° drehen' : null,
     onclick: async () => {
       state.lehrersicht = !state.lehrersicht;
       await db.speichereEinstellung('lehrersicht', state.lehrersicht);
       app.neuZeichnen();
     },
-  });
+  }, icon('drehen'), nurSymbol ? null : (state.lehrersicht ? 'Lehrersicht' : 'Schülersicht'));
 }
 
 // Wie groß darf ein Feld sein, damit das Raster in die Breite passt?
-// Wird anzahlZeilen angegeben, muss es auch in die Höhe passen (wichtig im Querformat).
+//   spalten / zeilen: je Spalte bzw. Zeile ein Faktor (1 = volles Feld, kleiner = Gang).
+// Wird "zeilen" angegeben, muss es auch in die Höhe passen (wichtig im Querformat);
+// "reserve" ist der Platz in px, den Umschalter, Leisten usw. in der Höhe brauchen.
 // Nie kleiner als "min" (Touch-Fläche), nie größer als "max".
-export function zellGroesse(anzahlSpalten, min, max, anzahlZeilen = 0) {
+export function zellGroesse({ spalten, zeilen = null, min, max, reserve = 0 }) {
   const inhalt = document.getElementById('inhalt');
-  const breite = inhalt.clientWidth - 30; // Ränder der Ansicht (2 × 12 px) + Rand des Rasters
-  let passend = Math.floor((breite - (anzahlSpalten - 1) * LUECKE) / anzahlSpalten);
-  if (anzahlZeilen) {
-    const hoehe = inhalt.clientHeight - 110; // Platz für Modus-Leiste und Infozeile
-    passend = Math.min(passend, Math.floor((hoehe - (anzahlZeilen - 1) * LUECKE) / anzahlZeilen));
-  }
-  return Math.max(min, Math.min(max, passend));
+  const passt = (platz, spuren) =>
+    Math.floor((platz - (spuren.length - 1) * LUECKE) / spuren.reduce((summe, f) => summe + f, 0));
+  // Die Ansicht ist höchstens 900 px breit (.ansicht); neben dem Raster bleiben je 6 px Rand (.raster-huelle)
+  let groesse = passt(Math.min(inhalt.clientWidth, 900) - 12, spalten);
+  if (zeilen) groesse = Math.min(groesse, passt(inhalt.clientHeight - reserve, zeilen));
+  return Math.max(min, Math.min(max, groesse));
 }

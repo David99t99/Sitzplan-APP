@@ -7,6 +7,7 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
 - Phase 1: Klassen, Raumraster, SuS (mit Foto und Namensliste), Zuweisen per Ziehen oder Antippen, Zufallsverteilung, Unterrichts-/Bearbeitungsmodus, offline-fähig.
 - Phase 2: Beobachtungen. Im Unterrichtsmodus öffnet Antippen einer Person das Schnellmenü (Mitarbeit +/−, Verhalten +/−, Schnellbuttons, Notiz) mit „Rückgängig“. Am Platz stehen die Zähler von heute. Dazu kommen der Verlauf pro Person (Filter, Summen, bearbeiten, löschen, nachtragen), die Klassenübersicht (sortierbar) und konfigurierbare Schnellbuttons.
 - Phase 3: Backup als Datei (inkl. Fotos) und Import, CSV-Export (Übersicht und alle Einträge), Backup-Erinnerung, Versionen der Sitzordnung (speichern, ansehen, wiederherstellen), Raumvorlagen, PIN-Sperre, Reihenfolge der Klassen-Tabs.
+- v6: Oberfläche überarbeitet. Der Sitzplan passt am Handy ganz auf den Bildschirm (Gänge werden schmal gezeichnet, Tafel und Lehrertisch als beschriftete Blöcke), im Bearbeitungsmodus bleibt die Leiste „Ohne Platz“ unten stehen, einheitliche Symbole, eigene Sicherheitsfragen statt Browser-Fenstern, Hinweise auf den jeweils nächsten Schritt.
 
 ## Projektstruktur
 
@@ -22,7 +23,8 @@ js/db.js                Datenmodell + alle Datenbankzugriffe
 js/util/raster.js       Rechnen mit dem Raster (Plätze, Tauschen, Zufall)
 js/util/ziehen.js       Drag & Drop mit dem Finger
 js/util/foto.js         Fotos verkleinern (400 × 400 px, JPEG)
-js/util/ui.js           Helfer: Elemente bauen, Dialoge, Meldungen, Avatare
+js/util/ui.js           Helfer: Elemente bauen, Dialoge, Sicherheitsfragen, Meldungen, Avatare
+js/util/icons.js        Symbole als SVG (überall gleich, statt Emojis)
 js/util/beobachtung.js  Kategorien, Zeiträume (Heute … Schuljahr), Summen, Datumsformat
 js/util/datei.js        Datei speichern (Laptop: Download, iPhone: Teilen) und Datei wählen
 js/util/sicherung.js    Backup (JSON), Prüfen beim Import, CSV, Backup-Erinnerung
@@ -114,7 +116,7 @@ auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v5';` erhöhen (v6, v7 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v6';` erhöhen (v7, v8 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.

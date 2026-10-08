@@ -1,5 +1,7 @@
 // ui.js – kleine Hilfsfunktionen für die Oberfläche.
 
+import { icon } from './icons.js';
+
 // el('button', { class: 'knopf', onclick: f }, 'Text')  ->  <button class="knopf">Text</button>
 // Eigenschaften:
 //   class, text, value, style (Objekt), dataset (Objekt), on<Ereignis> (Funktion),
@@ -60,9 +62,13 @@ export function zeigeDialog({ titel, inhalt = [], knoepfe = [{ text: 'OK', wert:
         [...knoepfe].reverse().map((k) => el('button', {
           type: 'submit',
           value: k.wert || '',
-          class: 'knopf' + (k.primaer ? ' primaer' : '') + (k.gefahr ? ' gefahr' : ''),
+          // "gefahr" als Hauptknopf = rot gefüllt (Sicherheitsfrage),
+          // als Nebenknopf = nur rote Schrift (z. B. "Löschen" neben "Speichern")
+          class: 'knopf' + (k.gefahr ? (k.primaer ? ' gefahr' : ' gefahr-leise') : (k.primaer ? ' primaer' : '')),
           // Abbrechen/Löschen sollen auch bei leeren Pflichtfeldern funktionieren
           formnovalidate: !k.primaer,
+          // "fokus": dieser Knopf ist beim Öffnen ausgewählt (Enter löst ihn aus)
+          autofocus: k.fokus,
           text: k.text,
         })),
       ),
@@ -77,9 +83,41 @@ export function zeigeDialog({ titel, inhalt = [], knoepfe = [{ text: 'OK', wert:
   });
 }
 
+// Sicherheitsfrage im Stil der App (statt des Browser-Fensters von confirm()).
+// Rückgabe: true, wenn bestätigt wurde. Mehrere Absätze im Text mit "\n" trennen.
+// Bei "gefahr" (Löschen) ist "Abbrechen" vorausgewählt, damit ein versehentliches
+// Enter nichts zerstört.
+//
+//   if (!await bestaetigen({ titel: 'Version löschen?', knopf: 'Löschen', gefahr: true })) return;
+export async function bestaetigen({ titel, text = '', knopf = 'OK', gefahr = false }) {
+  const ergebnis = await zeigeDialog({
+    titel,
+    inhalt: text.split('\n').filter(Boolean).map((absatz) => el('p', { text: absatz })),
+    knoepfe: [{ text: 'Abbrechen', fokus: gefahr }, { text: knopf, wert: 'ok', primaer: true, gefahr }],
+  });
+  return ergebnis === 'ok';
+}
+
 // Beschriftetes Eingabefeld: <label>Text <input></label>
 export function feld(beschriftung, eingabe) {
   return el('label', { class: 'feld' }, el('span', { text: beschriftung }), eingabe);
+}
+
+// Kopf einer Karte: farbiges Symbol + Überschrift
+export function kartenKopf(symbol, titel, gefahr = false) {
+  return el('div', { class: 'karten-kopf' },
+    el('span', { class: 'karten-symbol' + (gefahr ? ' gefahr' : '') }, icon(symbol)),
+    el('h2', { text: titel }),
+  );
+}
+
+// Farbiger Hinweis mit Knopf für den nächsten Schritt:
+//   "3 SuS haben noch keinen Platz."  [Plätze zuweisen ›]
+export function tipp(text, knopfText, onclick) {
+  return el('div', { class: 'tipp' },
+    el('span', { class: 'wachsen', text }),
+    el('button', { class: 'knopf klein primaer', onclick }, knopfText, icon('rechts')),
+  );
 }
 
 // ----------------------------- Personen-Darstellung -----------------------

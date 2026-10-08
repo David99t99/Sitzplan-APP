@@ -7,7 +7,8 @@
 // aus PIN + Zufallswert ("Salt").
 
 import * as db from '../db.js';
-import { el, toast, feld } from '../util/ui.js';
+import { el, toast, bestaetigen, feld, kartenKopf } from '../util/ui.js';
+import { icon } from '../util/icons.js';
 
 // ----------------------------------------------------------------- Hash
 
@@ -90,7 +91,7 @@ export async function sperren() {
       el('button', { class: klasse, type: 'button', text, onclick: aktion });
 
     const box = el('div', { class: 'pin-box' },
-      el('div', { class: 'pin-symbol', text: '🔒' }),
+      el('div', { class: 'pin-symbol' }, icon('schloss')),
       el('h2', { text: 'PIN eingeben' }),
       punkte,
       meldung,
@@ -98,7 +99,7 @@ export async function sperren() {
         ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((z) => knopf(z, () => ziffer(z))),
         knopf('Vergessen?', pinVergessen, 'pin-taste klein'),
         knopf('0', () => ziffer('0')),
-        knopf('⌫', loeschen, 'pin-taste klein'),
+        knopf('Löschen', loeschen, 'pin-taste klein'),
       ),
     );
     const overlay = el('div', { class: 'sperre', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'App gesperrt' }, box);
@@ -116,9 +117,16 @@ export async function sperren() {
 
 // PIN vergessen: Es gibt keine Hintertür. Nur alles löschen hilft (danach Backup einspielen).
 async function pinVergessen() {
-  const ok = confirm('PIN vergessen?\n\nDie PIN lässt sich nicht zurücksetzen. Du kannst nur ALLE Daten auf diesem Gerät löschen und danach ein Backup einspielen.\n\nAlle Daten löschen?');
-  if (!ok) return;
-  if (!confirm('Wirklich ALLE Klassen, SuS und Beobachtungen auf diesem Gerät löschen?')) return;
+  if (!await bestaetigen({
+    titel: 'PIN vergessen?',
+    text: 'Die PIN lässt sich nicht zurücksetzen.\nDu kannst nur ALLE Daten auf diesem Gerät löschen und danach ein Backup einspielen.',
+    knopf: 'Alle Daten löschen', gefahr: true,
+  })) return;
+  if (!await bestaetigen({
+    titel: 'Wirklich alles löschen?',
+    text: 'ALLE Klassen, SuS und Beobachtungen auf diesem Gerät werden endgültig gelöscht.',
+    knopf: 'Endgültig löschen', gefahr: true,
+  })) return;
   await db.alleDatenLoeschen();
   location.reload();
 }
@@ -141,7 +149,7 @@ export function automatischSperren() {
 // Karte für die Seite "Mehr": PIN aktivieren, ändern, entfernen
 export async function pinKarte(neuZeichnen) {
   const gespeichert = await pinLaden();
-  const karte = el('div', { class: 'karte' }, el('h2', { text: 'PIN-Sperre' }));
+  const karte = el('div', { class: 'karte' }, kartenKopf('schloss', 'PIN-Sperre'));
 
   const pinFelder = () => {
     const opt = { type: 'password', inputmode: 'numeric', pattern: '[0-9]{4,8}', maxlength: 8, autocomplete: 'off', required: true };
@@ -180,14 +188,14 @@ export async function pinKarte(neuZeichnen) {
   const aendern = el('details', {}, el('summary', { class: 'knopf', text: 'PIN ändern' }), neuForm('Neue PIN speichern'));
 
   karte.append(
-    el('p', { class: 'hinweis', text: '✓ PIN-Sperre ist aktiv.' }),
+    el('p', { class: 'status gut' }, icon('haken'), 'PIN-Sperre ist aktiv.'),
     feld('Sperren, wenn die App im Hintergrund war', sperreNach),
-    el('div', { class: 'leiste' },
-      el('button', { class: 'knopf', text: 'Jetzt sperren', onclick: sperren }),
+    el('div', { class: 'leiste fuellen' },
+      el('button', { class: 'knopf', onclick: sperren }, icon('schloss'), 'Jetzt sperren'),
       el('button', {
         class: 'knopf gefahr-leise', text: 'PIN entfernen',
         onclick: async () => {
-          if (!confirm('PIN-Sperre ausschalten?')) return;
+          if (!await bestaetigen({ titel: 'PIN-Sperre ausschalten?', knopf: 'Ausschalten' })) return;
           await pinEntfernen();
           toast('PIN-Sperre ausgeschaltet.');
           neuZeichnen();

@@ -35,8 +35,8 @@ db.version(1).stores({
   einstellungen: 'schluessel',
 });
 
-// Standardgröße eines neuen Rasters: 8 Spalten passen im Hochformat ohne Scrollen
-// bei mindestens 44 px pro Feld.
+// Standardgröße eines neuen Rasters: 8 Spalten passen am Handy im Hochformat
+// ohne seitliches Schieben in den Raum-Editor.
 export const STANDARD_SPALTEN = 8;
 export const STANDARD_ZEILEN = 10;
 

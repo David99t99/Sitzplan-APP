@@ -8,6 +8,7 @@
 import { state, app } from '../state.js';
 import * as db from '../db.js';
 import { el, toast, avatar, vollerName } from '../util/ui.js';
+import { icon } from '../util/icons.js';
 import { kategorieName, wertZeichen, uhrzeitText } from '../util/beobachtung.js';
 
 // person:      die angetippte Person
@@ -37,8 +38,8 @@ export async function oeffneSchnellmenue(person, heute = []) {
   // Zeile "Mitarbeit  [ + ] [ − ]"
   const plusMinus = (kategorie) => el('div', { class: 'pm-zeile' },
     el('span', { class: 'pm-titel', text: kategorieName(kategorie, schnellbuttons) }),
-    el('button', { class: 'pm plus', 'aria-label': kategorieName(kategorie, []) + ' plus', text: '+', onclick: () => eintragen(kategorie, 1) }),
-    el('button', { class: 'pm minus', 'aria-label': kategorieName(kategorie, []) + ' minus', text: '−', onclick: () => eintragen(kategorie, -1) }),
+    el('button', { class: 'pm plus', 'aria-label': kategorieName(kategorie, []) + ' plus', onclick: () => eintragen(kategorie, 1) }, icon('plus')),
+    el('button', { class: 'pm minus', 'aria-label': kategorieName(kategorie, []) + ' minus', onclick: () => eintragen(kategorie, -1) }, icon('minus')),
   );
 
   // Notiz: Enter oder Knopf speichert
@@ -67,7 +68,7 @@ export async function oeffneSchnellmenue(person, heute = []) {
         person.notiz ? el('small', { text: person.notiz }) : null,
       ),
       el('button', {
-        class: 'knopf klein', text: 'Verlauf ›',
+        class: 'knopf klein',
         onclick: () => {
           schliessen();
           state.personId = person.id;
@@ -75,8 +76,8 @@ export async function oeffneSchnellmenue(person, heute = []) {
           state.ansicht = 'person';
           app.neuZeichnen();
         },
-      }),
-      el('button', { class: 'knopf rund', 'aria-label': 'Schließen', text: '✕', onclick: schliessen }),
+      }, icon('verlauf'), 'Verlauf'),
+      el('button', { class: 'knopf rund leise', 'aria-label': 'Schließen', onclick: schliessen }, icon('x')),
     ),
     heuteListe,
     plusMinus('mitarbeit'),
@@ -90,7 +91,7 @@ export async function oeffneSchnellmenue(person, heute = []) {
     ) : null,
     el('div', { class: 'notiz-zeile' },
       notiz,
-      el('button', { class: 'knopf', text: 'Speichern', onclick: notizSpeichern }),
+      el('button', { class: 'knopf', text: 'Notieren', onclick: notizSpeichern }),
     ),
   ));
 
