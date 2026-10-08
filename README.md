@@ -88,7 +88,7 @@ geht ab Phase 3 mit Export/Import (eine Datei, z. B. per USB-Kabel, OneDrive ode
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v3';` erhöhen (v4, v5 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v4';` erhöhen (v5, v6 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.

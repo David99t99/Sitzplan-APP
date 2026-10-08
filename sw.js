@@ -5,7 +5,7 @@
 //
 // WICHTIG: Nach jeder Code-Änderung VERSION erhöhen (z. B. v2, v3 …).
 // Sonst lädt das Handy weiterhin die alte, gecachte Version.
-const VERSION = 'sitzplan-v3';
+const VERSION = 'sitzplan-v4';
 
 // Alle Dateien, die offline verfügbar sein müssen.
 // Neue Datei angelegt? -> hier eintragen!
@@ -37,7 +37,11 @@ const DATEIEN = [
 
 // 1) Installation: alle Dateien in einen neuen Cache laden
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(DATEIEN)));
+  // cache: 'reload' = Dateien wirklich frisch vom Server holen. Ohne das nimmt der
+  // Browser evtl. seine eigene Zwischenkopie (GitHub Pages erlaubt 10 Minuten) und
+  // die "neue" Version bestünde dann aus den alten Dateien.
+  const frisch = DATEIEN.map((datei) => new Request(datei, { cache: 'reload' }));
+  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(frisch)));
   self.skipWaiting(); // neue Version sofort aktivieren
 });
 
