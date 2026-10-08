@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <!-- viewport-fit=cover: damit wir die "sicheren Bereiche" (Notch, Home-Balken) per CSS berücksichtigen können -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sitzplan</title>
+
+  <!-- PWA: Manifest + Farben -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#2563eb">
+
+  <!-- iPhone: Homescreen-App ohne Safari-Leisten -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Sitzplan">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+  <!-- Oben: Klassen-Tabs -->
+  <header id="kopf"></header>
+
+  <!-- Mitte: die jeweilige Ansicht (Plan, SuS, Raum, Klasse) -->
+  <main id="inhalt"></main>
+
+  <!-- Unten: Navigation (gut mit dem Daumen erreichbar) -->
+  <nav id="navi"></nav>
+
+  <!-- Kleine Meldungen ("Gespeichert" usw.) -->
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- type="module": wir benutzen import/export, ganz ohne Build-Werkzeug -->
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

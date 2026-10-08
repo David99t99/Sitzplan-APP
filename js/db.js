@@ -1,0 +1,171 @@
+// db.js – Datenmodell und alle Zugriffe auf die Datenbank.
+//
+// Die Daten liegen in IndexedDB (einer Datenbank im Browser, nur auf diesem Gerät).
+// Dexie ist eine kleine Bibliothek, die IndexedDB deutlich angenehmer macht.
+// Alle anderen Dateien greifen NUR über die Funktionen hier auf Daten zu.
+
+import Dexie from '../lib/dexie.mjs';
+
+export const db = new Dexie('sitzplan');
+
+// ---------------------------------------------------------------------------
+// Schema (Version 1)
+// In der Zeichenkette stehen nur Primärschlüssel + Felder, nach denen gesucht wird.
+// Alle weiteren Felder eines Objekts werden trotzdem gespeichert.
+//
+// Klasse      { id, name, fach, raum, schuljahr, sortierung }
+// Sitzplan    { id, klasseId, aktuell (1 = aktuell, 0 = alte Version), datum, bezeichnung,
+//               zeilen, spalten,
+//               felder:    { "zeile-spalte": "sitz" | "pult" | "tafel" | "tuer" },
+//               zuordnung: { "zeile-spalte": personId } }
+// Person      { id, klasseId, vorname, nachname, foto (JPEG als Data-URL), notiz, farbe, archiviert }
+// Beobachtung { id, personId, klasseId, zeitpunkt, kategorie, wert, text }   (ab Phase 2)
+// Vorlage     { id, name, zeilen, spalten, felder }                          (ab Phase 3)
+// Einstellung { schluessel, wert }
+//
+// Hinweis: "aktuell" ist 1/0 statt true/false, weil IndexedDB nach
+// Wahrheitswerten nicht suchen kann.
+// ---------------------------------------------------------------------------
+db.version(1).stores({
+  klassen: 'id, sortierung',
+  sitzplaene: 'id, klasseId, [klasseId+aktuell]',
+  personen: 'id, klasseId',
+  beobachtungen: 'id, klasseId, personId, zeitpunkt',
+  vorlagen: 'id',
+  einstellungen: 'schluessel',
+});
+
+// Standardgröße eines neuen Rasters: 8 Spalten passen im Hochformat ohne Scrollen
+// bei mindestens 44 px pro Feld.
+export const STANDARD_SPALTEN = 8;
+export const STANDARD_ZEILEN = 10;
+
+// Eindeutige IDs (Texte statt fortlaufender Zahlen -> später problemlos
+// zwischen Geräten exportierbar, ohne dass sich IDs überschneiden).
+export function neueId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  // Rückfall für unsichere Verbindungen (http im WLAN), wo randomUUID fehlt
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+
+// ============================ Klassen ======================================
+
+export async function ladeKlassen() {
+  return db.klassen.orderBy('sortierung').toArray();
+}
+
+// Legt eine Klasse an und gleich dazu einen leeren, aktuellen Sitzplan.
+export async function legeKlasseAn({ name, fach = '', raum = '', schuljahr = '' }) {
+  const alle = await db.klassen.toArray();
+  const sortierung = alle.reduce((max, k) => Math.max(max, k.sortierung), 0) + 1;
+  const klasse = { id: neueId(), name, fach, raum, schuljahr, sortierung };
+
+  await db.transaction('rw', db.klassen, db.sitzplaene, async () => {
+    await db.klassen.add(klasse);
+    await db.sitzplaene.add(leererPlan(klasse.id));
+  });
+  return klasse;
+}
+
+export async function speichereKlasse(klasse) {
+  await db.klassen.put(klasse);
+}
+
+// Löscht eine Klasse mit ALLEM, was dazugehört (SuS, Pläne, Beobachtungen).
+export async function loescheKlasse(klasseId) {
+  await db.transaction('rw', db.klassen, db.sitzplaene, db.personen, db.beobachtungen, async () => {
+    await db.sitzplaene.where('klasseId').equals(klasseId).delete();
+    await db.personen.where('klasseId').equals(klasseId).delete();
+    await db.beobachtungen.where('klasseId').equals(klasseId).delete();
+    await db.klassen.delete(klasseId);
+  });
+}
+
+// ============================ Sitzpläne ====================================
+
+function leererPlan(klasseId) {
+  return {
+    id: neueId(),
+    klasseId,
+    aktuell: 1,
+    datum: new Date().toISOString(),
+    bezeichnung: '',
+    zeilen: STANDARD_ZEILEN,
+    spalten: STANDARD_SPALTEN,
+    felder: {},
+    zuordnung: {},
+  };
+}
+
+// Der aktuelle Sitzplan einer Klasse (wird angelegt, falls er fehlt).
+export async function ladeAktuellenPlan(klasseId) {
+  let plan = await db.sitzplaene.where({ klasseId, aktuell: 1 }).first();
+  if (!plan) {
+    plan = leererPlan(klasseId);
+    await db.sitzplaene.add(plan);
+  }
+  return plan;
+}
+
+export async function speicherePlan(plan) {
+  await db.sitzplaene.put(plan);
+}
+
+// ============================ Personen (SuS) ===============================
+
+// Alle (nicht archivierten) SuS einer Klasse, alphabetisch nach Nachname.
+export async function ladePersonen(klasseId) {
+  const liste = await db.personen.where('klasseId').equals(klasseId).toArray();
+  return liste
+    .filter((p) => !p.archiviert)
+    .sort((a, b) =>
+      (a.nachname + ' ' + a.vorname).localeCompare(b.nachname + ' ' + b.vorname, 'de'));
+}
+
+// Neue Person (ohne id) oder bestehende Person speichern.
+export async function speicherePerson(person) {
+  if (!person.id) {
+    person.id = neueId();
+    // Zufällige Farbe (Farbton 0–359) für den Initialen-Kreis
+    person.farbe = Math.floor(Math.random() * 360);
+    person.archiviert = false;
+  }
+  await db.personen.put(person);
+  return person;
+}
+
+// Löscht eine Person, entfernt sie aus dem aktuellen Sitzplan und löscht ihre Beobachtungen.
+export async function loeschePerson(person) {
+  await db.transaction('rw', db.personen, db.sitzplaene, db.beobachtungen, async () => {
+    const plan = await db.sitzplaene.where({ klasseId: person.klasseId, aktuell: 1 }).first();
+    if (plan) {
+      for (const key of Object.keys(plan.zuordnung)) {
+        if (plan.zuordnung[key] === person.id) delete plan.zuordnung[key];
+      }
+      await db.sitzplaene.put(plan);
+    }
+    await db.beobachtungen.where('personId').equals(person.id).delete();
+    await db.personen.delete(person.id);
+  });
+}
+
+// ============================ Einstellungen ================================
+
+export async function ladeEinstellung(schluessel, standard = null) {
+  const eintrag = await db.einstellungen.get(schluessel);
+  return eintrag ? eintrag.wert : standard;
+}
+
+export async function speichereEinstellung(schluessel, wert) {
+  await db.einstellungen.put({ schluessel, wert });
+}
+
+// ============================ Speicherschutz ===============================
+
+// Bittet den Browser, die Daten nicht automatisch zu löschen, wenn der
+// Speicher knapp wird. Gibt true zurück, wenn das gewährt wurde.
+export async function dauerhaftSpeichern() {
+  if (!navigator.storage || !navigator.storage.persist) return false;
+  if (await navigator.storage.persisted()) return true;
+  return navigator.storage.persist();
+}

@@ -1,0 +1,136 @@
+// raum.js – Raumraster festlegen: Welche Felder sind Sitzplätze, wo ist Tafel, Tür, Lehrertisch?
+//
+// Bedienung: Werkzeug wählen, dann Felder antippen.
+// Ein Feld, das schon diesen Typ hat, wird beim Antippen wieder geleert.
+
+import { state, app, aktuelleKlasse } from '../state.js';
+import * as db from '../db.js';
+import { el, toast, initialen } from '../util/ui.js';
+import { FELDTYPEN, feldKey, ausKey, anzeigeReihenfolge, sitzplaetze } from '../util/raster.js';
+import { sichtKnopf, zellGroesse } from './plan.js';
+
+const MIN_GROESSE = 2;
+const MAX_GROESSE = 20;
+
+export async function zeichneRaum(container) {
+  const klasse = aktuelleKlasse();
+  const [plan, personen] = await Promise.all([
+    db.ladeAktuellenPlan(klasse.id),
+    db.ladePersonen(klasse.id),
+  ]);
+  const personNachId = new Map(personen.map((p) => [p.id, p]));
+
+  // ---------- Werkzeuge ----------
+  const werkzeuge = [...Object.entries(FELDTYPEN), ['leer', { name: 'Radierer', symbol: '⌫' }]];
+  container.append(
+    el('p', { class: 'hinweis', text: 'Werkzeug wählen, dann Felder antippen. Nochmal antippen entfernt die Markierung.' }),
+    el('div', { class: 'werkzeuge', role: 'group', 'aria-label': 'Werkzeug' },
+      werkzeuge.map(([id, typ]) => el('button', {
+        class: 'werkzeug' + (state.werkzeug === id ? ' aktiv' : ''),
+        'aria-pressed': String(state.werkzeug === id),
+        onclick: () => { state.werkzeug = id; app.neuZeichnen(); },
+      }, el('span', { class: 'muster ' + id, text: typ.symbol }), el('span', { text: typ.name }))),
+    ),
+  );
+
+  // ---------- Größe + Sicht ----------
+  container.append(el('div', { class: 'leiste' },
+    stepper('Spalten', plan.spalten, (n) => groesseAendern(plan.zeilen, n)),
+    stepper('Zeilen', plan.zeilen, (n) => groesseAendern(n, plan.spalten)),
+    sichtKnopf(),
+  ));
+
+  // ---------- Das komplette Raster ----------
+  const zeilen = anzeigeReihenfolge(0, plan.zeilen - 1, state.lehrersicht);
+  const spalten = anzeigeReihenfolge(0, plan.spalten - 1, state.lehrersicht);
+  const raster = el('div', {
+    class: 'raster editor',
+    style: { '--spalten': spalten.length, '--zelle': zellGroesse(spalten.length, 44, 72) + 'px' },
+  });
+  for (const z of zeilen) {
+    for (const s of spalten) {
+      const key = feldKey(z, s);
+      const typ = plan.felder[key];
+      const person = personNachId.get(plan.zuordnung[key]);
+      raster.append(el('div', {
+        class: 'zelle ' + (typ || 'leer'),
+        role: 'button',
+        'aria-label': typ ? FELDTYPEN[typ].name : 'leeres Feld',
+        // Besetzte Plätze zeigen die Initialen, damit man sieht, wer dort sitzt
+        text: person ? initialen(person) : (typ ? FELDTYPEN[typ].symbol : ''),
+        onclick: () => feldAntippen(key),
+      }));
+    }
+  }
+  // "Vorne" = Zeile 0. In der Lehrersicht ist vorne unten.
+  const vorne = el('div', { class: 'vorne-markierung', text: 'vorne' });
+  container.append(el('div', { class: 'raster-huelle', dataset: { scroll: 'raum' } },
+    state.lehrersicht ? '' : vorne, raster, state.lehrersicht ? vorne : ''));
+
+  // ---------- Zusammenfassung + Aktionen ----------
+  const anzahlPlaetze = sitzplaetze(plan).length;
+  container.append(
+    el('p', { class: 'unterzeile', text: `${anzahlPlaetze} Sitzplätze · ${personen.length} SuS` }),
+    el('div', { class: 'leiste' },
+      el('button', { class: 'knopf gefahr-leise', text: 'Alles leeren', onclick: allesLeeren }),
+      el('button', {
+        class: 'knopf primaer', text: 'Fertig → SuS setzen',
+        onclick: () => { state.ansicht = 'plan'; state.modus = 'bearbeiten'; app.neuZeichnen(); },
+      }),
+    ),
+  );
+
+  // ======================= Hilfsfunktionen ==================================
+
+  async function feldAntippen(key) {
+    const alt = plan.felder[key];
+    const neu = (state.werkzeug === 'leer' || alt === state.werkzeug) ? null : state.werkzeug;
+    if (neu) plan.felder[key] = neu;
+    else delete plan.felder[key];
+
+    // Wird ein besetzter Sitzplatz entfernt, kommt die Person in "Ohne Platz"
+    if (neu !== 'sitz' && plan.zuordnung[key]) {
+      const p = personNachId.get(plan.zuordnung[key]);
+      delete plan.zuordnung[key];
+      if (p) toast(`${p.vorname} ist jetzt ohne Platz.`);
+    }
+    await db.speicherePlan(plan);
+    app.neuZeichnen();
+  }
+
+  async function groesseAendern(neueZeilen, neueSpalten) {
+    neueZeilen = Math.max(MIN_GROESSE, Math.min(MAX_GROESSE, neueZeilen));
+    neueSpalten = Math.max(MIN_GROESSE, Math.min(MAX_GROESSE, neueSpalten));
+
+    // Markierte Felder, die beim Verkleinern wegfallen würden
+    const weg = Object.keys(plan.felder).filter((k) => {
+      const [z, s] = ausKey(k);
+      return z >= neueZeilen || s >= neueSpalten;
+    });
+    if (weg.length && !confirm(`${weg.length} markierte Felder liegen außerhalb und werden entfernt. Fortfahren?`)) return;
+
+    for (const k of weg) { delete plan.felder[k]; delete plan.zuordnung[k]; }
+    plan.zeilen = neueZeilen;
+    plan.spalten = neueSpalten;
+    await db.speicherePlan(plan);
+    app.neuZeichnen();
+  }
+
+  async function allesLeeren() {
+    if (!confirm('Alle Markierungen entfernen? Alle SuS kommen in „Ohne Platz“.')) return;
+    plan.felder = {};
+    plan.zuordnung = {};
+    await db.speicherePlan(plan);
+    app.neuZeichnen();
+  }
+}
+
+// [−] 8 [+]
+function stepper(beschriftung, wert, setze) {
+  return el('div', { class: 'stepper' },
+    el('span', { class: 'stepper-titel', text: beschriftung }),
+    el('button', { class: 'knopf rund', 'aria-label': beschriftung + ' weniger', text: '−', onclick: () => setze(wert - 1) }),
+    el('output', { text: String(wert) }),
+    el('button', { class: 'knopf rund', 'aria-label': beschriftung + ' mehr', text: '+', onclick: () => setze(wert + 1) }),
+  );
+}

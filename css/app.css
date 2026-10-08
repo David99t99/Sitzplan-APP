@@ -1,0 +1,420 @@
+/* app.css – Aussehen der App.
+   Farben stehen als Variablen oben, damit man sie leicht ändern kann.
+   Dunkler Modus wird automatisch übernommen, wenn das iPhone dunkel eingestellt ist. */
+
+:root {
+  --hintergrund: #f4f5f7;
+  --flaeche: #ffffff;
+  --text: #1c1f24;
+  --leise: #6b7280;
+  --rand: #d9dce1;
+  --akzent: #2563eb;
+  --akzent-text: #ffffff;
+  --akzent-hell: #dbe6fd;
+  --gefahr: #c62828;
+  --sitz: #eef1f5;
+  --sitz-rand: #c3c9d2;
+  --tafel: #1f6f43;
+  --pult: #d8a76a;
+  --tuer: #c9ccd2;
+  --leer-editor: #e9ebef;
+  --luecke: 4px;          /* Abstand zwischen Rasterfeldern (auch in plan.js!) */
+  --radius: 10px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hintergrund: #111317;
+    --flaeche: #1c1f25;
+    --text: #eceef2;
+    --leise: #9aa1ad;
+    --rand: #343a44;
+    --akzent: #4f8bff;
+    --akzent-hell: #1f3157;
+    --sitz: #262b33;
+    --sitz-rand: #444c58;
+    --tafel: #2e7d50;
+    --pult: #8a6a43;
+    --tuer: #4a4f58;
+    --leer-editor: #20242b;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  /* Kopf | Inhalt (scrollt) | Navigation */
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100dvh;
+  background: var(--hintergrund);
+  color: var(--text);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  touch-action: manipulation;          /* kein Doppeltipp-Zoom */
+  -webkit-tap-highlight-color: transparent;
+  /* Notch / Dynamic Island im Querformat */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+h2 { font-size: 1.15rem; margin: 0 0 .75rem; }
+h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600; }
+
+/* ------------------------------------------------------------ Kopf: Tabs */
+#kopf {
+  background: var(--flaeche);
+  border-bottom: 1px solid var(--rand);
+  padding-top: env(safe-area-inset-top);
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--rand);
+  border-radius: 22px;
+  background: var(--flaeche);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tab.aktiv { background: var(--akzent); border-color: var(--akzent); color: var(--akzent-text); }
+.tab.plus { min-width: 44px; padding: 0; font-size: 1.4rem; line-height: 1; color: var(--akzent); }
+
+/* ------------------------------------------------------------ Inhalt */
+#inhalt {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ansicht {
+  padding: 12px;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.leiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hinweis { color: var(--leise); font-size: .9rem; margin: 0; }
+.unterzeile { color: var(--leise); font-size: .9rem; margin: 0; text-align: center; }
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.leer-hinweis { text-align: center; align-items: center; }
+.leer-hinweis p { margin: 0; }
+
+/* ------------------------------------------------------------ Knöpfe */
+.knopf {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--rand);
+  border-radius: var(--radius);
+  background: var(--flaeche);
+  font-weight: 500;
+}
+.knopf:active { filter: brightness(.92); }
+.knopf.primaer { background: var(--akzent); border-color: var(--akzent); color: var(--akzent-text); font-weight: 600; }
+.knopf.gefahr { background: var(--gefahr); border-color: var(--gefahr); color: #fff; }
+.knopf.gefahr-leise { color: var(--gefahr); }
+.knopf.klein { font-size: .9rem; padding: 0 12px; }
+.knopf.rund { width: 44px; padding: 0; font-size: 1.3rem; }
+
+/* Umschalter Unterricht | Bearbeiten */
+.umschalter {
+  display: flex;
+  flex: 1;
+  min-width: 230px;
+  background: var(--rand);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 3px;
+}
+.umschalter-knopf {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font-weight: 600;
+  font-size: .92rem;
+  white-space: nowrap;
+}
+.umschalter-knopf.aktiv { background: var(--flaeche); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
+
+/* ------------------------------------------------------------ Raster */
+.raster-huelle {
+  overflow-x: auto;      /* zu breite Raster lassen sich seitlich schieben */
+  padding: 6px 2px;
+}
+.raster {
+  display: grid;
+  grid-template-columns: repeat(var(--spalten), var(--zelle));
+  grid-auto-rows: var(--zelle);
+  gap: var(--luecke);
+  width: max-content;
+  margin: 0 auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;   /* kein iOS-Menü bei langem Drücken */
+}
+.zelle {
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-size: calc(var(--zelle) * .4);
+  line-height: 1;
+  overflow: hidden;
+}
+.zelle.leer { background: transparent; }
+.zelle.sitz { background: var(--sitz); border: 1.5px dashed var(--sitz-rand); }
+.zelle.sitz.besetzt { border-style: solid; background: var(--flaeche); }
+.zelle.tafel { background: var(--tafel); }
+.zelle.pult { background: var(--pult); }
+.zelle.tuer { background: var(--tuer); }
+.zelle .avatar { width: 62%; }
+.zelle .name {
+  font-size: max(9px, calc(var(--zelle) * .19));
+  font-weight: 600;
+  max-width: 96%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Raum-Editor: leere Felder sichtbar machen */
+.raster.editor .zelle { cursor: pointer; font-size: calc(var(--zelle) * .36); font-weight: 700; }
+.raster.editor .zelle.leer { background: var(--leer-editor); border: 1px solid var(--rand); }
+.raster.editor .zelle.sitz { border-style: solid; }
+.vorne-markierung {
+  text-align: center;
+  font-size: .75rem;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--leise);
+  margin: 4px 0;
+}
+
+/* Auswahl und Ziehen */
+.ausgewaehlt { outline: 3px solid var(--akzent); outline-offset: 1px; }
+.ziel-hover { outline: 3px dashed var(--akzent); outline-offset: 1px; background: var(--akzent-hell) !important; }
+.wird-gezogen { opacity: .35; }
+.raster.bearbeiten .zelle.besetzt,
+.chip { touch-action: none; }   /* Finger zieht die Person statt die Seite zu scrollen */
+.geist {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: .92;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .3);
+}
+
+/* ------------------------------------------------------------ Avatar */
+.avatar {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  container-type: inline-size;   /* damit die Initialen mit dem Kreis mitwachsen */
+  flex: none;
+}
+.avatar span { font-size: 42cqi; line-height: 1; }
+
+/* ------------------------------------------------------------ Leiste "Ohne Platz" */
+.ohne-platz {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 14px;
+  padding: 12px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 8px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 14px 4px 4px;
+  border: 1px solid var(--rand);
+  border-radius: 24px;
+  background: var(--hintergrund);
+  font-weight: 600;
+  cursor: grab;
+}
+.chip .avatar { width: 36px; }
+
+/* ------------------------------------------------------------ Raum-Editor: Werkzeuge */
+.werkzeuge { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.werkzeug {
+  min-height: 56px;
+  border: 1px solid var(--rand);
+  border-radius: var(--radius);
+  background: var(--flaeche);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: .72rem;
+  padding: 4px 2px;
+}
+.werkzeug.aktiv { border: 2px solid var(--akzent); background: var(--akzent-hell); font-weight: 600; }
+.muster {
+  width: 26px;
+  height: 20px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .8rem;
+}
+.muster.sitz { background: var(--sitz); border: 1.5px solid var(--sitz-rand); }
+.muster.tafel { background: var(--tafel); }
+.muster.pult { background: var(--pult); }
+.muster.tuer { background: var(--tuer); }
+.muster.leer { background: var(--leer-editor); border: 1px solid var(--rand); }
+
+.stepper { display: inline-flex; align-items: center; gap: 6px; }
+.stepper-titel { font-size: .9rem; color: var(--leise); }
+.stepper output { min-width: 1.6em; text-align: center; font-weight: 700; }
+
+/* ------------------------------------------------------------ SuS-Liste */
+.liste { list-style: none; margin: 0; padding: 0; background: var(--flaeche); border: 1px solid var(--rand); border-radius: 14px; overflow: hidden; }
+.liste li + li { border-top: 1px solid var(--rand); }
+.zeile {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.zeile .avatar { width: 44px; }
+.zeile-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.zeile-text small { color: var(--leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pfeil { color: var(--leise); font-size: 1.4rem; }
+
+/* ------------------------------------------------------------ Formulare + Dialoge */
+.feld { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--leise); }
+input, textarea, select {
+  font: inherit;
+  font-size: 16px;   /* unter 16 px zoomt das iPhone beim Antippen hinein */
+  color: var(--text);
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 8px;
+  padding: 10px;
+  width: 100%;
+  min-height: 44px;
+}
+textarea { resize: vertical; }
+
+.dialog {
+  width: min(94vw, 480px);
+  max-height: 90dvh;
+  border: 0;
+  border-radius: 16px;
+  padding: 18px;
+  background: var(--flaeche);
+  color: var(--text);
+}
+.dialog::backdrop { background: rgb(0 0 0 / .45); }
+.dialog-inhalt { display: flex; flex-direction: column; gap: 12px; }
+.dialog-knoepfe {
+  display: flex;
+  flex-direction: row-reverse;   /* siehe zeigeDialog() in ui.js */
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+}
+.dialog-knoepfe .knopf { flex: 1; }
+
+.foto-bereich { display: flex; align-items: center; gap: 14px; }
+.foto-vorschau { width: 88px; flex: none; }
+.foto-vorschau .avatar { width: 88px; }
+.foto-knoepfe { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+
+/* ------------------------------------------------------------ Navigation unten */
+#navi {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--flaeche);
+  border-top: 1px solid var(--rand);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+#navi:empty { display: none; }
+.navi-knopf {
+  min-height: 56px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: .75rem;
+  color: var(--leise);
+}
+.navi-knopf.aktiv { color: var(--akzent); font-weight: 600; }
+.navi-symbol { font-size: 1.3rem; line-height: 1; }
+
+/* ------------------------------------------------------------ Toast */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  transform: translate(-50%, 20px);
+  max-width: min(92vw, 480px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: #23272e;
+  color: #fff;
+  font-size: .95rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s, transform .2s;
+  z-index: 2000;
+}
+#toast.sichtbar { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast-knopf { border: 0; background: transparent; color: #8fb4ff; font-weight: 700; min-height: 44px; }
+
+/* ------------------------------------------------------------ Querformat am Handy:
+   Kopf und Navigation schlanker, damit mehr Platz für den Sitzplan bleibt */
+@media (orientation: landscape) and (max-height: 500px) {
+  .tabs { padding: 4px 12px; }
+  .navi-knopf { min-height: 44px; flex-direction: row; gap: 6px; font-size: .85rem; }
+  .ansicht { padding-top: 8px; gap: 8px; }
+}
