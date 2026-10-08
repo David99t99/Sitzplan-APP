@@ -149,6 +149,65 @@ export async function loeschePerson(person) {
   });
 }
 
+// ============================ Beobachtungen ================================
+//
+// Eine Beobachtung hängt an der PERSON (nicht am Platz) und übersteht daher jedes Umsetzen.
+//   kategorie: 'mitarbeit' | 'verhalten' | 'notiz' | 'sb-<id>' (Schnellbutton, z. B. 'sb-hue')
+//   wert:      +1, -1 oder 0 (Notizen)
+//   zeitpunkt: ISO-Zeitstempel, z. B. "2026-10-08T07:45:12.000Z" (lässt sich als Text sortieren)
+//   text:      optionale Notiz
+
+export async function legeBeobachtungAn({ personId, klasseId, kategorie, wert, text = '' }) {
+  const b = { id: neueId(), personId, klasseId, kategorie, wert, text, zeitpunkt: new Date().toISOString() };
+  await db.beobachtungen.add(b);
+  return b;
+}
+
+export async function speichereBeobachtung(b) {
+  await db.beobachtungen.put(b);
+}
+
+export async function loescheBeobachtung(id) {
+  await db.beobachtungen.delete(id);
+}
+
+// Alle Beobachtungen einer Klasse ab einem Zeitpunkt (ISO-Text oder null = alle), neueste zuerst
+export async function ladeBeobachtungenKlasse(klasseId, ab = null, bis = null) {
+  const liste = await db.beobachtungen.where('klasseId').equals(klasseId).toArray();
+  return liste
+    .filter((b) => (!ab || b.zeitpunkt >= ab) && (!bis || b.zeitpunkt < bis))
+    .sort((a, b) => b.zeitpunkt.localeCompare(a.zeitpunkt));
+}
+
+// Alle Beobachtungen einer Person, neueste zuerst
+export async function ladeBeobachtungenPerson(personId) {
+  const liste = await db.beobachtungen.where('personId').equals(personId).toArray();
+  return liste.sort((a, b) => b.zeitpunkt.localeCompare(a.zeitpunkt));
+}
+
+export async function ladePerson(id) {
+  return db.personen.get(id);
+}
+
+// ============================ Schnellbuttons ===============================
+//
+// Die frei konfigurierbaren Knöpfe im Schnellmenü (gelten für alle Klassen).
+// Gelöschte Knöpfe bleiben mit "geloescht: true" in der Liste, damit alte
+// Einträge weiterhin ihren Namen anzeigen.
+
+export const STANDARD_SCHNELLBUTTONS = [
+  { id: 'hue', name: 'Hausübung vergessen', wert: -1 },
+  { id: 'material', name: 'Material vergessen', wert: -1 },
+];
+
+export async function ladeSchnellbuttons() {
+  return ladeEinstellung('schnellbuttons', STANDARD_SCHNELLBUTTONS);
+}
+
+export async function speichereSchnellbuttons(liste) {
+  await speichereEinstellung('schnellbuttons', liste);
+}
+
 // ============================ Einstellungen ================================
 
 export async function ladeEinstellung(schluessel, standard = null) {

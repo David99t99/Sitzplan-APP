@@ -9,13 +9,18 @@ import { zeichnePlan } from './views/plan.js';
 import { zeichneRaum } from './views/raum.js';
 import { zeichneSchueler } from './views/schueler.js';
 import { zeichneKlasse, neueKlasseDialog } from './views/klasse.js';
+import { zeichneUebersicht } from './views/uebersicht.js';
+import { zeichnePerson } from './views/person.js';
 
-// Die vier Ansichten der unteren Navigation
+// Die Ansichten. "versteckt" = erscheint nicht in der unteren Navigation.
+// "breit" = darf am Laptop die ganze Breite nutzen (Tabellen).
 const ANSICHTEN = [
   { id: 'plan', name: 'Sitzplan', symbol: '▦', zeichne: zeichnePlan },
+  { id: 'uebersicht', name: 'Übersicht', symbol: '☰', zeichne: zeichneUebersicht, breit: true },
   { id: 'schueler', name: 'SuS', symbol: '👥', zeichne: zeichneSchueler },
   { id: 'raum', name: 'Raum', symbol: '✎', zeichne: zeichneRaum },
   { id: 'klasse', name: 'Klasse', symbol: '⚙︎', zeichne: zeichneKlasse },
+  { id: 'person', name: 'Verlauf', zeichne: zeichnePerson, versteckt: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -29,11 +34,11 @@ async function neuZeichnen() {
   zeichneKopf();
   zeichneNavi();
 
-  const neu = el('div', { class: 'ansicht' });
+  const ansicht = ANSICHTEN.find((a) => a.id === state.ansicht) || ANSICHTEN[0];
+  const neu = el('div', { class: 'ansicht' + (ansicht.breit ? ' breit' : '') });
   if (!aktuelleKlasse()) {
     zeichneWillkommen(neu);
   } else {
-    const ansicht = ANSICHTEN.find((a) => a.id === state.ansicht) || ANSICHTEN[0];
     await ansicht.zeichne(neu);
   }
 
@@ -68,9 +73,11 @@ function zeichneKopf() {
 function zeichneNavi() {
   const navi = document.getElementById('navi');
   if (!aktuelleKlasse()) { navi.replaceChildren(); return; }
-  navi.replaceChildren(...ANSICHTEN.map((a) => el('button', {
-    class: 'navi-knopf' + (state.ansicht === a.id ? ' aktiv' : ''),
-    'aria-current': state.ansicht === a.id ? 'page' : null,
+  // In der Verlaufsansicht bleibt der Knopf markiert, von dem man gekommen ist
+  const aktiv = state.ansicht === 'person' ? state.zurueck : state.ansicht;
+  navi.replaceChildren(...ANSICHTEN.filter((a) => !a.versteckt).map((a) => el('button', {
+    class: 'navi-knopf' + (aktiv === a.id ? ' aktiv' : ''),
+    'aria-current': aktiv === a.id ? 'page' : null,
     onclick: () => { state.ansicht = a.id; state.auswahl = null; neuZeichnen(); },
   }, el('span', { class: 'navi-symbol', text: a.symbol }), el('span', { text: a.name }))));
 }
@@ -78,6 +85,7 @@ function zeichneNavi() {
 async function klasseWechseln(id) {
   state.klasseId = id;
   state.auswahl = null;
+  if (state.ansicht === 'person') state.ansicht = state.zurueck; // Verlauf gehört zur alten Klasse
   await db.speichereEinstellung('letzteKlasse', id);
   neuZeichnen();
 }

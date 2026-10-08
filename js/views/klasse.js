@@ -26,7 +26,7 @@ export async function zeichneKlasse(container) {
 
   const loeschen = el('div', { class: 'karte' },
     el('h2', { text: 'Klasse löschen' }),
-    el('p', { class: 'hinweis', text: 'Löscht die Klasse mit allen SuS, Fotos und Sitzplänen. Das lässt sich nicht rückgängig machen.' }),
+    el('p', { class: 'hinweis', text: 'Löscht die Klasse mit allen SuS, Fotos, Sitzplänen und Beobachtungen. Das lässt sich nicht rückgängig machen.' }),
     el('button', {
       class: 'knopf gefahr', text: `„${klasse.name}“ löschen`,
       onclick: async () => {
@@ -42,7 +42,49 @@ export async function zeichneKlasse(container) {
     }),
   );
 
-  container.append(formular, loeschen, await speicherInfo());
+  container.append(formular, await schnellbuttonsKarte(), loeschen, await speicherInfo());
+}
+
+// Schnellbuttons im Schnellmenü konfigurieren (gelten für alle Klassen)
+async function schnellbuttonsKarte() {
+  const liste = await db.ladeSchnellbuttons();
+  const zeichen = { '1': '+', '-1': '−', '0': '•' };
+
+  const name = el('input', { placeholder: 'z. B. Referat gehalten', maxlength: 30 });
+  const wert = el('select', { 'aria-label': 'Wertung' },
+    el('option', { value: '-1', text: '− negativ' }),
+    el('option', { value: '1', text: '+ positiv' }),
+    el('option', { value: '0', text: '• neutral' }));
+
+  return el('div', { class: 'karte' },
+    el('h2', { text: 'Schnellbuttons' }),
+    el('p', { class: 'hinweis', text: 'Zusätzliche Knöpfe im Schnellmenü. Gelten für alle Klassen. Bereits erfasste Einträge bleiben beim Entfernen erhalten.' }),
+    el('ul', { class: 'liste' }, liste.filter((s) => !s.geloescht).map((s) => el('li', { class: 'sb-eintrag' },
+      el('span', { class: 'eintrag-zeichen ' + (s.wert > 0 ? 'positiv' : s.wert < 0 ? 'negativ' : 'neutral'), text: zeichen[s.wert] }),
+      el('span', { class: 'wachsen', text: s.name }),
+      el('button', {
+        class: 'knopf rund', 'aria-label': s.name + ' entfernen', text: '✕',
+        onclick: async () => {
+          if (!confirm(`Schnellbutton „${s.name}“ entfernen?`)) return;
+          s.geloescht = true; // nur ausblenden, damit alte Einträge ihren Namen behalten
+          await db.speichereSchnellbuttons(liste);
+          app.neuZeichnen();
+        },
+      }),
+    ))),
+    el('form', {
+      class: 'sb-neu',
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const n = name.value.trim();
+        if (!n) return;
+        liste.push({ id: db.neueId().slice(0, 8), name: n, wert: Number(wert.value) });
+        await db.speichereSchnellbuttons(liste);
+        toast(`„${n}“ hinzugefügt.`);
+        app.neuZeichnen();
+      },
+    }, name, wert, el('button', { class: 'knopf', type: 'submit', text: 'Hinzufügen' })),
+  );
 }
 
 // Dialog "Neue Klasse" – danach geht es direkt zum Raumraster

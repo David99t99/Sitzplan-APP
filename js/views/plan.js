@@ -1,7 +1,8 @@
 // plan.js – die Hauptansicht: der Sitzplan der Klasse.
 //
 // Zwei Modi:
-//   Unterricht  – gesperrt, nichts lässt sich verschieben (ab Phase 2: Beobachtungen eintragen)
+//   Unterricht  – gesperrt, nichts lässt sich verschieben. Antippen öffnet das Schnellmenü
+//                 für Beobachtungen; am Platz stehen die Zähler von heute.
 //   Bearbeiten  – SuS auf Plätze setzen, tauschen, zufällig verteilen
 //
 // Zuweisen geht auf zwei Arten:
@@ -10,21 +11,30 @@
 
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
-import { el, toast, avatar, kurznamen, vollerName } from '../util/ui.js';
+import { el, toast, avatar, kurznamen } from '../util/ui.js';
 import {
   FELDTYPEN, feldKey, belegterBereich, anzeigeReihenfolge,
   platzieren, freigeben, aufraeumen, zufaelligVerteilen,
 } from '../util/raster.js';
 import { ziehbarMachen, warGeradeGezogen } from '../util/ziehen.js';
+import { zeitraumGrenzen } from '../util/beobachtung.js';
+import { oeffneSchnellmenue } from './schnellmenue.js';
 
 const LUECKE = 4; // Abstand zwischen den Feldern in px (muss zu --luecke in app.css passen)
 
 export async function zeichnePlan(container) {
   const klasse = aktuelleKlasse();
-  const [plan, personen] = await Promise.all([
+  const [plan, personen, heuteAlle] = await Promise.all([
     db.ladeAktuellenPlan(klasse.id),
     db.ladePersonen(klasse.id),
+    db.ladeBeobachtungenKlasse(klasse.id, zeitraumGrenzen('heute').ab),
   ]);
+  // Heutige Einträge nach Person sortiert: Map personId -> [Einträge]
+  const heute = new Map();
+  for (const b of heuteAlle) {
+    if (!heute.has(b.personId)) heute.set(b.personId, []);
+    heute.get(b.personId).push(b);
+  }
   const bearbeiten = state.modus === 'bearbeiten';
   const personNachId = new Map(personen.map((p) => [p.id, p]));
   const namen = kurznamen(personen);
@@ -90,10 +100,14 @@ export async function zeichnePlan(container) {
       leisteOhnePlatz(),
     );
   } else if (ohnePlatz.length > 0) {
-    container.append(el('p', {
-      class: 'hinweis',
-      text: `${ohnePlatz.length} SuS ohne Platz – im Modus „Bearbeiten“ zuweisen.`,
-    }));
+    // Auch SuS ohne Platz sollen im Unterricht Einträge bekommen können
+    container.append(el('section', { class: 'ohne-platz' },
+      el('h3', { text: `Ohne Platz (${ohnePlatz.length})` }),
+      el('div', { class: 'chips' }, ohnePlatz.map((p) => el('button', {
+        class: 'chip',
+        onclick: () => oeffneSchnellmenue(p, heute.get(p.id)),
+      }, avatar(p), el('span', { text: namen.get(p.id) }), marken(p.id)))),
+    ));
   }
 
   // ======================= Hilfsfunktionen ==================================
@@ -114,6 +128,7 @@ export async function zeichnePlan(container) {
     });
     if (person) {
       feld.append(avatar(person), el('span', { class: 'name', text: namen.get(person.id) }));
+      if (!bearbeiten) feld.append(marken(person.id));
       if (bearbeiten) ziehbarMachen(feld, { onDrop: (ziel) => fallenLassen(person.id, ziel) });
     }
     return feld;
@@ -124,8 +139,7 @@ export async function zeichnePlan(container) {
     const personId = plan.zuordnung[key];
 
     if (!bearbeiten) {
-      // Phase 1: nur den vollen Namen zeigen. Ab Phase 2 öffnet sich hier das Schnellmenü.
-      if (personId) toast(vollerName(personNachId.get(personId)));
+      if (personId) oeffneSchnellmenue(personNachId.get(personId), heute.get(personId));
       return;
     }
 
@@ -173,6 +187,19 @@ export async function zeichnePlan(container) {
         app.neuZeichnen();
       },
     }, el('h3', { text: `Ohne Platz (${ohnePlatz.length})` }), inhalt);
+  }
+
+  // Kleine Zähler für heute: grün = positive, rot = negative Einträge, Punkt = Notiz
+  function marken(personId) {
+    const liste = heute.get(personId) || [];
+    const plus = liste.filter((b) => b.wert > 0).length;
+    const minus = liste.filter((b) => b.wert < 0).length;
+    const notiz = liste.some((b) => b.wert === 0);
+    return el('span', { class: 'marken', 'aria-label': `heute ${plus} plus, ${minus} minus` },
+      plus ? el('span', { class: 'marke positiv', text: '+' + plus }) : null,
+      minus ? el('span', { class: 'marke negativ', text: '−' + minus }) : null,
+      notiz ? el('span', { class: 'marke neutral', text: '•' }) : null,
+    );
   }
 
   // Eine Person in der Leiste "Ohne Platz"
@@ -230,7 +257,7 @@ export function sichtKnopf() {
 // Nie kleiner als "min" (Touch-Fläche), nie größer als "max".
 export function zellGroesse(anzahlSpalten, min, max, anzahlZeilen = 0) {
   const inhalt = document.getElementById('inhalt');
-  const breite = inhalt.clientWidth - 24; // 2 × 12 px Rand
+  const breite = inhalt.clientWidth - 30; // Ränder der Ansicht (2 × 12 px) + Rand des Rasters
   let passend = Math.floor((breite - (anzahlSpalten - 1) * LUECKE) / anzahlSpalten);
   if (anzahlZeilen) {
     const hoehe = inhalt.clientHeight - 110; // Platz für Modus-Leiste und Infozeile

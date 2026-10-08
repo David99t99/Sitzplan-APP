@@ -3,7 +3,9 @@
 Sitzordnungen pro Klasse anlegen und im Unterricht nutzen.
 Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud, kein Tracking.
 
-**Stand: Phase 1** – Klassen, Raumraster, SuS (mit Foto und Namensliste), Zuweisen per Ziehen oder Antippen, Zufallsverteilung, Unterrichts-/Bearbeitungsmodus, offline-fähig.
+**Stand: Phase 2**
+- Phase 1: Klassen, Raumraster, SuS (mit Foto und Namensliste), Zuweisen per Ziehen oder Antippen, Zufallsverteilung, Unterrichts-/Bearbeitungsmodus, offline-fähig.
+- Phase 2: Beobachtungen. Im Unterrichtsmodus öffnet Antippen einer Person das Schnellmenü (Mitarbeit +/−, Verhalten +/−, Schnellbuttons, Notiz) mit „Rückgängig“. Am Platz stehen die Zähler von heute. Dazu kommen der Verlauf pro Person (Filter, Summen, bearbeiten, löschen, nachtragen), die Klassenübersicht (sortierbar) und konfigurierbare Schnellbuttons unter „Klasse“.
 
 ## Projektstruktur
 
@@ -20,10 +22,14 @@ js/util/raster.js       Rechnen mit dem Raster (Plätze, Tauschen, Zufall)
 js/util/ziehen.js       Drag & Drop mit dem Finger
 js/util/foto.js         Fotos verkleinern (400 × 400 px, JPEG)
 js/util/ui.js           Helfer: Elemente bauen, Dialoge, Meldungen, Avatare
+js/util/beobachtung.js  Kategorien, Zeiträume (Heute … Schuljahr), Summen, Datumsformat
 js/views/plan.js        Ansicht "Sitzplan"
 js/views/raum.js        Ansicht "Raum" (Raster-Editor)
 js/views/schueler.js    Ansicht "SuS"
-js/views/klasse.js      Ansicht "Klasse" + Dialog "Neue Klasse"
+js/views/klasse.js      Ansicht "Klasse" + Dialog "Neue Klasse" + Schnellbuttons
+js/views/schnellmenue.js  Schnellmenü im Unterrichtsmodus
+js/views/person.js      Verlauf einer Person (+ Filterleiste, Eintrag-Dialog)
+js/views/uebersicht.js  Klassenübersicht (Tabelle)
 ```
 
 Prinzip: Jede Änderung wird sofort in der Datenbank gespeichert, danach baut
@@ -34,10 +40,14 @@ Prinzip: Jede Änderung wird sofort in der Datenbank gespeichert, danach baut
 Die Dateien müssen über einen kleinen Webserver laufen (Doppelklick auf
 `index.html` reicht nicht, weil Module und Service Worker das verbieten).
 
-```bash
-cd sitzplan
-python3 -m http.server 8000
+Unter Windows (Eingabeaufforderung oder PowerShell im Ordner `sitzplan`):
+
 ```
+py -m http.server 8000
+```
+
+(Mac/Linux: `python3 -m http.server 8000`.) Falls `py` fehlt: Python von python.org
+installieren, oder in VS Code die Erweiterung „Live Server“ verwenden.
 
 Dann im Browser `http://localhost:8000` öffnen. Handy-Ansicht: In Chrome oder
 Safari die Entwicklerwerkzeuge öffnen und die Geräte-Ansicht (iPhone) wählen.
@@ -64,10 +74,21 @@ Wichtig fürs iPhone:
 - Der Code ist öffentlich sichtbar (bei öffentlichem Repo) – die **Daten nicht**,
   die liegen nur auf deinem Handy.
 
+## Am Laptop (Windows) nutzen
+
+Die GitHub-Pages-Adresse in **Edge oder Chrome** öffnen und rechts in der Adressleiste
+„App installieren“ wählen. Dann läuft der Sitzplan wie ein eigenes Programm im
+eigenen Fenster, auch offline. Am Laptop funktioniert alles mit der Maus: Ziehen,
+Anklicken, Escape schließt Fenster.
+
+**Wichtig:** Laptop und iPhone haben **getrennte Daten**, weil alles lokal gespeichert wird
+und es absichtlich keine Cloud gibt. Daten von einem Gerät aufs andere übertragen
+geht ab Phase 3 mit Export/Import (eine Datei, z. B. per USB-Kabel, OneDrive oder Mail an dich selbst).
+
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v1';` erhöhen (v2, v3 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v2';` erhöhen (v3, v4 …).
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.
 4. App am iPhone schließen und neu öffnen (manchmal zweimal). Die Daten bleiben erhalten.

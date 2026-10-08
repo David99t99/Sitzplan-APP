@@ -18,6 +18,9 @@
   --pult: #d8a76a;
   --tuer: #c9ccd2;
   --leer-editor: #e9ebef;
+  --positiv: #1b8a3a;
+  --negativ: #c62828;
+  --neutral: #6b7280;
   --luecke: 4px;          /* Abstand zwischen Rasterfeldern (auch in plan.js!) */
   --radius: 10px;
   color-scheme: light dark;
@@ -38,6 +41,9 @@
     --pult: #8a6a43;
     --tuer: #4a4f58;
     --leer-editor: #20242b;
+    --positiv: #4cc46c;
+    --negativ: #ff6b6b;
+    --neutral: #9aa1ad;
   }
 }
 
@@ -177,6 +183,7 @@ h3 { font-size: .95rem; margin: 0 0 .5rem; color: var(--leise); font-weight: 600
   -webkit-touch-callout: none;   /* kein iOS-Menü bei langem Drücken */
 }
 .zelle {
+  position: relative;   /* für die Zähler-Marken in den Ecken */
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -367,7 +374,7 @@ textarea { resize: vertical; }
 /* ------------------------------------------------------------ Navigation unten */
 #navi {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--flaeche);
   border-top: 1px solid var(--rand);
   padding-bottom: env(safe-area-inset-bottom);
@@ -418,3 +425,185 @@ textarea { resize: vertical; }
   .navi-knopf { min-height: 44px; flex-direction: row; gap: 6px; font-size: .85rem; }
   .ansicht { padding-top: 8px; gap: 8px; }
 }
+
+/* ============================================================ Phase 2: Beobachtungen */
+
+.positiv { color: var(--positiv); }
+.negativ { color: var(--negativ); }
+.neutral { color: var(--neutral); }
+.wachsen { flex: 1; min-width: 0; margin: 0; }
+
+/* Am Laptop: Tabellen dürfen breiter werden */
+.ansicht.breit { max-width: 1400px; }
+
+/* ------------------------------------------------------------ Zähler am Platz */
+.marken {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  pointer-events: none;
+}
+.chip .marken { position: static; flex-direction: row; }
+.marke {
+  min-width: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  font-size: max(9px, calc(var(--zelle, 50px) * .15));
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  color: #fff;
+}
+.marke.positiv { background: var(--positiv); color: #fff; }
+.marke.negativ { background: var(--negativ); color: #fff; }
+.marke.neutral { background: var(--neutral); color: #fff; min-width: 0; }
+
+/* ------------------------------------------------------------ Schnellmenü (Blatt von unten) */
+.dialog.blatt {
+  padding: 0;
+  margin: auto auto 0;            /* Handy: unten am Bildschirm */
+  width: 100%;
+  max-width: 520px;
+  border-radius: 18px 18px 0 0;
+}
+.blatt-inhalt {
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.blatt-kopf { display: flex; align-items: center; gap: 10px; }
+.blatt-kopf .avatar { width: 48px; }
+.blatt-name { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.blatt-name strong { font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blatt-name small { color: var(--leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.heute-liste { margin: 0; font-size: .85rem; color: var(--leise); display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.heute-eintrag { white-space: nowrap; }
+
+.pm-zeile { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: center; }
+.pm-titel { font-weight: 600; }
+.pm {
+  min-height: 64px;               /* große Daumenfläche */
+  border: 0;
+  border-radius: 14px;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}
+.pm.plus { background: var(--positiv); }
+.pm.minus { background: var(--negativ); }
+.pm:active { transform: scale(.96); }
+
+.sb-raster { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.knopf.sb { min-height: 52px; font-size: .92rem; line-height: 1.2; padding: 4px 10px; }
+.knopf.sb.negativ { border-color: color-mix(in srgb, var(--negativ) 45%, var(--rand)); color: var(--text); }
+.knopf.sb.positiv { border-color: color-mix(in srgb, var(--positiv) 45%, var(--rand)); color: var(--text); }
+.notiz-zeile { display: flex; gap: 8px; }
+.notiz-zeile input { flex: 1; }
+
+/* Am Laptop / Tablet: Schnellmenü als Fenster in der Mitte */
+@media (min-width: 700px) and (min-height: 600px) {
+  .dialog.blatt { margin: auto; border-radius: 18px; }
+}
+
+/* ------------------------------------------------------------ Filter */
+.filter { display: flex; flex-wrap: wrap; gap: 8px; }
+.feld.kompakt { flex: 1 1 140px; max-width: 260px; }
+
+/* ------------------------------------------------------------ Verlauf einer Person */
+.person-kopf { display: flex; align-items: center; gap: 14px; }
+.person-kopf .avatar { width: 64px; }
+.person-kopf h2 { margin: 0; }
+
+.kacheln { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.kachel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  text-align: left;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid var(--rand);
+  border-radius: 12px;
+  background: var(--flaeche);
+}
+.kachel.aktiv { border: 2px solid var(--akzent); background: var(--akzent-hell); }
+.kachel-titel { font-size: .8rem; color: var(--leise); }
+.kachel-wert { font-size: 1.05rem; }
+
+.liste .tag-kopf {
+  padding: 8px 12px 4px;
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--leise);
+  background: var(--hintergrund);
+}
+.zeile.eintrag { min-height: 52px; }
+.eintrag-zeichen {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+  background: var(--hintergrund);
+}
+.eintrag-zeit { color: var(--leise); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ Klassenübersicht */
+.tabelle-huelle {
+  width: fit-content;   /* am Laptop nur so breit wie nötig … */
+  max-width: 100%;      /* … am Handy seitlich scrollbar */
+  overflow-x: auto;
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 14px;
+}
+.tabelle { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+.tabelle thead th[rowspan] { white-space: normal; max-width: 96px; line-height: 1.2; }
+.tabelle th, .tabelle td { padding: 8px 10px; border-bottom: 1px solid var(--rand); white-space: nowrap; }
+.tabelle thead th { font-size: .8rem; color: var(--leise); font-weight: 600; background: var(--flaeche); }
+.tabelle th.gruppe { text-align: center; border-bottom: 0; padding-bottom: 0; color: var(--text); }
+.tabelle th.sortierbar { cursor: pointer; user-select: none; min-height: 44px; }
+.tabelle th.sortiert { color: var(--akzent); }
+.tabelle tbody tr { cursor: pointer; }
+.tabelle tbody tr:last-child > * { border-bottom: 0; }
+.tabelle td.zahl { text-align: center; min-width: 38px; }
+.tabelle td.null { color: var(--rand); }
+.tabelle td.summe { font-weight: 700; }
+.tabelle td.summe.null { color: var(--leise); font-weight: 400; }
+/* Erste Spalte bleibt beim seitlichen Scrollen stehen */
+.tabelle .name-spalte {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--flaeche);
+  text-align: left;
+  border-right: 1px solid var(--rand);
+}
+.name-zelle { display: flex; align-items: center; gap: 8px; font-weight: 600; min-height: 32px; }
+.name-zelle .avatar { width: 30px; }
+
+/* ------------------------------------------------------------ Schnellbuttons einstellen */
+.sb-eintrag { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; }
+.sb-eintrag .knopf.rund { border: 0; background: transparent; color: var(--leise); }
+.sb-neu { display: flex; flex-wrap: wrap; gap: 8px; }
+.sb-neu input { flex: 2 1 180px; width: auto; }
+.sb-neu select { flex: 1 1 110px; width: auto; }
+
+/* ------------------------------------------------------------ Maus (Laptop): Hover-Effekte */
+@media (hover: hover) {
+  .knopf:hover, .tab:hover, .werkzeug:hover, .kachel:hover { filter: brightness(.96); }
+  .zeile:hover, .tabelle tbody tr:hover > * { background: var(--hintergrund); }
+  .raster:not(.bearbeiten) .zelle.besetzt:hover { box-shadow: 0 0 0 2px var(--akzent); cursor: pointer; }
+  .navi-knopf:hover { color: var(--text); }
+}
+.ansicht.breit .unterzeile { text-align: left; }
