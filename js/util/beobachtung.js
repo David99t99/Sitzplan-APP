@@ -6,8 +6,17 @@
 export const KATEGORIEN = {
   mitarbeit: 'Mitarbeit',
   verhalten: 'Verhalten',
+  abwesend: 'Abwesend',
   notiz: 'Notiz',
 };
+
+// Abwesenheit: ein Eintrag mit kategorie 'abwesend' und wert 0 (zählt nicht als plus/minus).
+// Wer heute so einen Eintrag hat, gilt im Sitzplan als abwesend.
+export const ABWESEND = 'abwesend';
+
+export function istAbwesend(eintraege = []) {
+  return eintraege.some((b) => b.kategorie === ABWESEND);
+}
 
 // Lesbarer Name einer Kategorie (auch für Schnellbuttons)
 export function kategorieName(kategorie, schnellbuttons) {
@@ -16,7 +25,7 @@ export function kategorieName(kategorie, schnellbuttons) {
   return sb ? sb.name : kategorie;
 }
 
-// Alle Kategorien für Filter und Tabellen: Mitarbeit, Verhalten, Schnellbuttons, Notiz
+// Alle Kategorien für Filter und Tabellen: Mitarbeit, Verhalten, Schnellbuttons, Abwesend, Notiz
 export function alleKategorien(schnellbuttons, mitGeloeschten = false) {
   return [
     { id: 'mitarbeit', name: 'Mitarbeit' },
@@ -24,6 +33,7 @@ export function alleKategorien(schnellbuttons, mitGeloeschten = false) {
     ...schnellbuttons
       .filter((s) => mitGeloeschten || !s.geloescht)
       .map((s) => ({ id: 'sb-' + s.id, name: s.name })),
+    { id: ABWESEND, name: 'Abwesend' },
     { id: 'notiz', name: 'Notiz' },
   ];
 }

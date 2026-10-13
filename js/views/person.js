@@ -7,7 +7,7 @@ import { el, toast, zeigeDialog, feld, avatar, vollerName } from '../util/ui.js'
 import { icon } from '../util/icons.js';
 import {
   ZEITRAEUME, zeitraumGrenzen, imZeitraum, summen, alleKategorien, kategorieName,
-  wertZeichen, summeText, tagText, uhrzeitText, fuerEingabe,
+  wertZeichen, summeText, tagText, uhrzeitText, fuerEingabe, ABWESEND,
 } from '../util/beobachtung.js';
 import { wertKlasse } from './schnellmenue.js';
 
@@ -64,6 +64,7 @@ export async function zeichnePerson(container) {
     kachel('Verhalten', pm('verhalten'), 'verhalten'),
     schnellbuttons.filter((sb) => !sb.geloescht || s['sb-' + sb.id])
       .map((sb) => kachel(sb.name, anzahl('sb-' + sb.id), 'sb-' + sb.id)),
+    kachel('Abwesend', anzahl(ABWESEND), ABWESEND),
     kachel('Notizen', anzahl('notiz'), 'notiz'),
   ));
 
@@ -152,7 +153,7 @@ async function eintragDialog(b, schnellbuttons, istNeu) {
   kategorie.addEventListener('change', () => {
     const sb = schnellbuttons.find((s) => 'sb-' + s.id === kategorie.value);
     if (sb) wert.value = String(sb.wert);
-    else if (kategorie.value === 'notiz') wert.value = '0';
+    else if (kategorie.value === 'notiz' || kategorie.value === ABWESEND) wert.value = '0';
   });
   const zeit = el('input', { type: 'datetime-local', value: fuerEingabe(b.zeitpunkt), required: true });
   const text = el('textarea', { rows: 2, value: b.text || '', maxlength: 500 });

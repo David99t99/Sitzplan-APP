@@ -45,6 +45,7 @@ export async function zeichneUebersicht(container) {
       w[k + '-summe'] = s[k]?.summe || 0;
     }
     for (const sb of buttons) w['sb-' + sb.id] = s['sb-' + sb.id]?.anzahl || 0;
+    w.abwesend = s.abwesend?.anzahl || 0;
     w.notiz = s.notiz?.anzahl || 0;
     return { person: p, w };
   });
@@ -78,6 +79,7 @@ export async function zeichneUebersicht(container) {
       el('th', { colspan: 3, class: 'gruppe', text: 'Mitarbeit' }),
       el('th', { colspan: 3, class: 'gruppe', text: 'Verhalten' }),
       buttons.map((sb) => kopf('sb-' + sb.id, sb.name, { rowspan: 2 })),
+      kopf('abwesend', 'Abwesend', { rowspan: 2 }),
       kopf('notiz', 'Notizen', { rowspan: 2 }),
     ),
     el('tr', {},
@@ -103,6 +105,7 @@ export async function zeichneUebersicht(container) {
     zahl(w['mitarbeit-plus'], 'positiv'), zahl(w['mitarbeit-minus'], 'negativ'), summeZelle(w['mitarbeit-summe']),
     zahl(w['verhalten-plus'], 'positiv'), zahl(w['verhalten-minus'], 'negativ'), summeZelle(w['verhalten-summe']),
     buttons.map((sb) => zahl(w['sb-' + sb.id])),
+    zahl(w.abwesend),
     zahl(w.notiz),
   )));
 
@@ -116,12 +119,12 @@ export async function zeichneUebersicht(container) {
         class: 'knopf klein',
         onclick: () => csvUebersicht(klasse,
           ['Nachname', 'Vorname', 'Mitarbeit +', 'Mitarbeit −', 'Mitarbeit Summe',
-            'Verhalten +', 'Verhalten −', 'Verhalten Summe', ...buttons.map((sb) => sb.name), 'Notizen',
+            'Verhalten +', 'Verhalten −', 'Verhalten Summe', ...buttons.map((sb) => sb.name), 'Abwesend', 'Notizen',
             'Zeitraum'],
           zeilen.map(({ person, w }) => [person.nachname, person.vorname,
             w['mitarbeit-plus'], w['mitarbeit-minus'], w['mitarbeit-summe'],
             w['verhalten-plus'], w['verhalten-minus'], w['verhalten-summe'],
-            ...buttons.map((sb) => w['sb-' + sb.id]), w.notiz, zeitraumName()])),
+            ...buttons.map((sb) => w['sb-' + sb.id]), w.abwesend, w.notiz, zeitraumName()])),
       }, icon('herunter'), 'Übersicht als CSV'),
       el('button', {
         class: 'knopf klein',

@@ -258,8 +258,8 @@ export async function loeschePerson(person) {
 // ============================ Beobachtungen ================================
 //
 // Eine Beobachtung hängt an der PERSON (nicht am Platz) und übersteht daher jedes Umsetzen.
-//   kategorie: 'mitarbeit' | 'verhalten' | 'notiz' | 'sb-<id>' (Schnellbutton, z. B. 'sb-hue')
-//   wert:      +1, -1 oder 0 (Notizen)
+//   kategorie: 'mitarbeit' | 'verhalten' | 'notiz' | 'abwesend' | 'sb-<id>' (Schnellbutton, z. B. 'sb-hue')
+//   wert:      +1, -1 oder 0 (Notizen, Abwesenheit)
 //   zeitpunkt: ISO-Zeitstempel, z. B. "2026-10-08T07:45:12.000Z" (lässt sich als Text sortieren)
 //   text:      optionale Notiz
 

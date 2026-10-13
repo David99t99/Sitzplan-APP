@@ -348,6 +348,7 @@ h3 {
 .knopf.klein { min-height: 44px; font-size: .9rem; padding: 0 12px; gap: 6px; }
 .knopf.rund { width: 46px; padding: 0; }
 .knopf.breit { width: 100%; }
+.knopf.aktiv { border: 2px solid var(--akzent); background: var(--akzent-hell); }
 
 /* Umschalter Unterricht | Bearbeiten */
 .umschalter {
@@ -842,6 +843,13 @@ select {
 .marke.positiv { background: var(--positiv-fuellung); color: #fff; }
 .marke.negativ { background: var(--negativ-fuellung); color: #fff; }
 .marke.neutral { background: var(--neutral); color: #fff; min-width: 0; width: .8em; height: .8em; padding: 0; margin: .15em; }
+
+.marke.abwesend { background: var(--neutral); }
+
+/* Heute abwesend: Platz wie unbesetzt, Person ausgegraut (die Marke "abw." bleibt kräftig) */
+.zelle.sitz.abwesend { background: var(--sitz); box-shadow: none; }
+.zelle.abwesend .avatar, .zelle.abwesend .name,
+.chip.abwesend .avatar, .chip.abwesend > span:not(.marken) { opacity: .35; filter: grayscale(1); }
 
 /* ------------------------------------------------------------ Schnellmenü (Blatt von unten) */
 .dialog.blatt {

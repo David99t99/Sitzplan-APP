@@ -3,6 +3,7 @@
 // Zwei Modi:
 //   Unterricht  – gesperrt, nichts lässt sich verschieben. Antippen öffnet das Schnellmenü
 //                 für Beobachtungen; am Platz stehen die Zähler von heute.
+//                 Wer heute als abwesend eingetragen ist, erscheint ausgegraut.
 //   Bearbeiten  – SuS auf Plätze setzen, tauschen, zufällig verteilen
 //
 // Zuweisen geht auf zwei Arten:
@@ -22,7 +23,7 @@ import {
   platzieren, freigeben, aufraeumen, zufaelligVerteilen,
 } from '../util/raster.js';
 import { ziehbarMachen, warGeradeGezogen } from '../util/ziehen.js';
-import { zeitraumGrenzen } from '../util/beobachtung.js';
+import { zeitraumGrenzen, istAbwesend, ABWESEND } from '../util/beobachtung.js';
 import { oeffneSchnellmenue } from './schnellmenue.js';
 import { versionSpeichernDialog } from './versionen.js';
 
@@ -80,9 +81,10 @@ export async function zeichnePlan(container) {
   const gewaehlt = bearbeiten ? personNachId.get(state.auswahl) : null;
 
   // ---------- Kopfleiste: Modus ----------
-  // Zeile darunter: links Fach · Raum (Unterricht) bzw. die Anleitung (Bearbeiten),
-  // rechts "Ansicht drehen". Gleiche Höhe in beiden Modi, damit das Raster nicht springt.
-  let info = [klasse.fach, raum.name].filter(Boolean).join(' · ');
+  // Zeile darunter: links Fach · Raum · wie viele heute fehlen (Unterricht) bzw. die Anleitung
+  // (Bearbeiten), rechts "Ansicht drehen". Gleiche Höhe in beiden Modi, damit das Raster nicht springt.
+  const fehlen = personen.filter((p) => istAbwesend(heute.get(p.id))).length;
+  let info = [klasse.fach, raum.name, fehlen && `${fehlen} abwesend`].filter(Boolean).join(' · ');
   if (gewaehlt) info = `${namen.get(gewaehlt.id)} ist markiert – jetzt den Platz antippen.`;
   else if (bearbeiten) info = 'Person ziehen – oder antippen und dann den Platz antippen.';
   container.append(el('div', { class: 'plan-kopf' },
@@ -173,7 +175,7 @@ export async function zeichnePlan(container) {
     container.append(el('section', { class: 'ohne-platz' },
       el('div', { class: 'ohne-platz-kopf' }, el('h3', { text: `Ohne Platz (${ohnePlatz.length})` })),
       el('div', { class: 'chips' }, ohnePlatz.map((p) => el('button', {
-        class: 'chip',
+        class: 'chip' + (istAbwesend(heute.get(p.id)) ? ' abwesend' : ''),
         onclick: () => oeffneSchnellmenue(p, heute.get(p.id)),
       }, avatar(p), el('span', { text: namen.get(p.id) }), marken(p.id)))),
     ));
@@ -187,6 +189,7 @@ export async function zeichnePlan(container) {
     const feld = el('div', {
       class: 'zelle sitz'
         + (person ? ' besetzt' : '')
+        + (person && !bearbeiten && istAbwesend(heute.get(person.id)) ? ' abwesend' : '')
         + (person && state.auswahl === person.id ? ' ausgewaehlt' : ''),
       dataset: { ziel: 'sitz', key },
       onclick: () => sitzAntippen(key),
@@ -281,15 +284,21 @@ export async function zeichnePlan(container) {
     );
   }
 
-  // Kleine Zähler für heute: links rot = negative, rechts grün = positive Einträge, Punkt = Notiz
+  // Kleine Zähler für heute: links rot = negative, rechts grün = positive Einträge, Punkt = Notiz.
+  // Wer heute abwesend ist, bekommt links zusätzlich "abw.".
   function marken(personId) {
     const liste = heute.get(personId) || [];
     const plus = liste.filter((b) => b.wert > 0).length;
     const minus = liste.filter((b) => b.wert < 0).length;
-    const notiz = liste.some((b) => b.wert === 0);
-    if (!plus && !minus && !notiz) return null;
-    return el('span', { class: 'marken', 'aria-label': `heute ${plus} plus, ${minus} minus` },
+    const notiz = liste.some((b) => b.wert === 0 && b.kategorie !== ABWESEND);
+    const abwesend = istAbwesend(liste);
+    if (!plus && !minus && !notiz && !abwesend) return null;
+    return el('span', {
+      class: 'marken',
+      'aria-label': `heute ${plus} plus, ${minus} minus` + (abwesend ? ', abwesend' : ''),
+    },
       el('span', { class: 'marken-seite' },
+        abwesend ? el('span', { class: 'marke abwesend', text: 'abw.' }) : null,
         minus ? el('span', { class: 'marke negativ', text: '−' + minus }) : null),
       el('span', { class: 'marken-seite rechts' },
         plus ? el('span', { class: 'marke positiv', text: '+' + plus }) : null,

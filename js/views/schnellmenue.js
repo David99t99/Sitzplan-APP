@@ -9,7 +9,7 @@ import { state, app } from '../state.js';
 import * as db from '../db.js';
 import { el, toast, avatar, vollerName } from '../util/ui.js';
 import { icon } from '../util/icons.js';
-import { kategorieName, wertZeichen, uhrzeitText } from '../util/beobachtung.js';
+import { kategorieName, wertZeichen, uhrzeitText, ABWESEND } from '../util/beobachtung.js';
 
 // person:      die angetippte Person
 // heute:       ihre Einträge von heute (für die Anzeige im Kopf)
@@ -31,6 +31,24 @@ export async function oeffneSchnellmenue(person, heute = []) {
         await db.loescheBeobachtung(b.id);
         await app.neuZeichnen();
         toast('Eintrag entfernt.');
+      },
+    });
+  }
+
+  // Abwesenheit umschalten: als abwesend eintragen – oder, wenn heute schon eingetragen,
+  // den Eintrag wieder entfernen ("doch da").
+  const abwesenheiten = heute.filter((b) => b.kategorie === ABWESEND);
+  async function abwesenheitUmschalten() {
+    if (abwesenheiten.length === 0) return eintragen(ABWESEND, 0);
+    schliessen();
+    for (const b of abwesenheiten) await db.loescheBeobachtung(b.id);
+    await app.neuZeichnen();
+    toast(`${person.vorname}: wieder anwesend`, {
+      knopf: 'Rückgängig',
+      dauer: 5000,
+      aktion: async () => {
+        for (const b of abwesenheiten) await db.speichereBeobachtung(b);
+        await app.neuZeichnen();
       },
     });
   }
@@ -89,6 +107,11 @@ export async function oeffneSchnellmenue(person, heute = []) {
         onclick: () => eintragen('sb-' + s.id, s.wert),
       })),
     ) : null,
+    el('button', {
+      class: 'knopf' + (abwesenheiten.length ? ' aktiv' : ''),
+      text: abwesenheiten.length ? 'Wieder anwesend' : 'Abwesend',
+      onclick: abwesenheitUmschalten,
+    }),
     el('div', { class: 'notiz-zeile' },
       notiz,
       el('button', { class: 'knopf', text: 'Notieren', onclick: notizSpeichern }),
