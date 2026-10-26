@@ -26,6 +26,7 @@ import { ziehbarMachen, warGeradeGezogen } from '../util/ziehen.js';
 import { zeitraumGrenzen, istAbwesend, ABWESEND } from '../util/beobachtung.js';
 import { oeffneSchnellmenue } from './schnellmenue.js';
 import { versionSpeichernDialog } from './versionen.js';
+import { stundeInfo } from './stundenplan.js';
 
 const LUECKE = 5;    // Abstand zwischen den Feldern in px (muss zu --luecke in app.css passen)
 const GANG = 0.35;   // Gang (Spalte/Zeile ohne Plätze): so viel von einem normalen Feld
@@ -34,11 +35,13 @@ const FLACH = 0.6;   // Spalte/Zeile, in der nur Tafel oder Tür liegen
 export async function zeichnePlan(container) {
   const klasse = aktuelleKlasse();
   // plan = wer sitzt wo (gehört der Klasse), raum = wo die Plätze sind (gilt für alle Klassen im Raum)
-  const [plan, raum, personen, heuteAlle] = await Promise.all([
+  // schule = Stundenzeiten für "3. Stunde · noch 12 Min" (oder null)
+  const [plan, raum, personen, heuteAlle, schule] = await Promise.all([
     db.ladeAktuellenPlan(klasse.id),
     db.ladeRaum(klasse.raumId),
     db.ladePersonen(klasse.id),
     db.ladeBeobachtungenKlasse(klasse.id, zeitraumGrenzen('heute').ab),
+    db.ladeSchule(klasse.schuleId),
   ]);
   // Heutige Einträge nach Person sortiert: Map personId -> [Einträge]
   const heute = new Map();
@@ -81,10 +84,13 @@ export async function zeichnePlan(container) {
   const gewaehlt = bearbeiten ? personNachId.get(state.auswahl) : null;
 
   // ---------- Kopfleiste: Modus ----------
-  // Zeile darunter: links Fach · Raum · wie viele heute fehlen (Unterricht) bzw. die Anleitung
-  // (Bearbeiten), rechts "Ansicht drehen". Gleiche Höhe in beiden Modi, damit das Raster nicht springt.
+  // Zeile darunter: links die laufende Stunde bzw. Fach · Raum, dazu wie viele heute fehlen
+  // (Unterricht) oder die Anleitung (Bearbeiten), rechts "Ansicht drehen". Gleiche Höhe in
+  // beiden Modi, damit das Raster nicht springt.
   const fehlen = personen.filter((p) => istAbwesend(heute.get(p.id))).length;
-  let info = [klasse.fach, raum.name, fehlen && `${fehlen} abwesend`].filter(Boolean).join(' · ');
+  const ort = [klasse.fach, raum.name].filter(Boolean).join(' · ');
+  const abwesend = fehlen ? `${fehlen} abwesend` : '';
+  let info = [ort, abwesend].filter(Boolean).join(' · ');
   if (gewaehlt) info = `${namen.get(gewaehlt.id)} ist markiert – jetzt den Platz antippen.`;
   else if (bearbeiten) info = 'Person ziehen – oder antippen und dann den Platz antippen.';
   container.append(el('div', { class: 'plan-kopf' },
@@ -93,7 +99,7 @@ export async function zeichnePlan(container) {
       modusKnopf('bearbeiten', 'stift', 'Bearbeiten'),
     ),
     el('div', { class: 'plan-info' },
-      el('p', { class: 'unterzeile wachsen' + (gewaehlt ? ' akzent' : ''), text: info }),
+      el('p', { class: 'unterzeile wachsen' + (gewaehlt ? ' akzent' : '') }, bearbeiten ? info : stundeInfo(schule, ort, abwesend)),
       sichtKnopf(),
     ),
   ));

@@ -14,6 +14,7 @@ import { zeichneKlasse, neueKlasseDialog, backupErstellen, backupEinspielen } fr
 import { zeichneUebersicht } from './views/uebersicht.js';
 import { zeichnePerson } from './views/person.js';
 import { zeichneVersionen } from './views/versionen.js';
+import { zeichneStundenplan, klasseJetzt } from './views/stundenplan.js';
 import { sperren, automatischSperren } from './views/sperre.js';
 import { backupErinnerung, erinnerungVerschieben } from './util/sicherung.js';
 
@@ -23,6 +24,7 @@ const ANSICHTEN = [
   { id: 'plan', name: 'Sitzplan', symbol: 'sitzplan', zeichne: zeichnePlan },
   { id: 'uebersicht', name: 'Übersicht', symbol: 'uebersicht', zeichne: zeichneUebersicht, breit: true },
   { id: 'schueler', name: 'SuS', symbol: 'sus', zeichne: zeichneSchueler },
+  { id: 'stundenplan', name: 'Stundenplan', symbol: 'kalender', zeichne: zeichneStundenplan },
   { id: 'raum', name: 'Räume', symbol: 'raum', zeichne: zeichneRaum },
   { id: 'klasse', name: 'Mehr', symbol: 'mehr', zeichne: zeichneKlasse },
   { id: 'person', name: 'Verlauf', zeichne: zeichnePerson, versteckt: true },
@@ -59,9 +61,9 @@ async function neuZeichnen() {
   inhalt.replaceChildren(neu);
   inhalt.querySelectorAll('[data-scroll]').forEach((e) => { e.scrollLeft = scroll[e.dataset.scroll] || 0; });
 
-  // Andere Ansicht, andere Klasse oder anderer Raum: wieder ganz oben beginnen
+  // Andere Ansicht, andere Klasse, anderer Raum oder andere Schule: wieder ganz oben beginnen
   const seite = [state.ansicht, state.klasseId, state.ansicht === 'person' ? state.personId : '',
-    state.ansicht === 'raum' ? state.raumId : ''].join('|');
+    state.ansicht === 'raum' ? state.raumId : '', state.ansicht === 'stundenplan' ? state.schuleId : ''].join('|');
   if (seite !== letzteSeite) inhalt.scrollTop = 0;
   letzteSeite = seite;
 }
@@ -82,18 +84,24 @@ async function ladeAppVersion() {
 }
 
 // Oben: ein Tab pro Klasse + "+" für eine neue Klasse.
+// Gehört eine Klasse zu einer Schule, steht unter ihrem Namen ein Strich in der Farbe der Schule.
 // Die Tabs lassen sich durch Ziehen umsortieren (am Handy: gedrückt halten, dann ziehen).
 function zeichneKopf() {
   const kopf = document.getElementById('kopf');
   // Wird gerade ein Tab verschoben, bleibt die Leiste stehen (sonst risse sie ihn dem Finger weg)
   if (kopf.querySelector('.wird-verschoben')) return;
 
-  const tabs = state.klassen.map((k) => el('button', {
-    class: 'tab' + (k.id === state.klasseId ? ' aktiv' : ''),
-    text: k.name,
-    dataset: { id: k.id },
-    onclick: () => { if (!warGeradeGezogen()) klasseWechseln(k.id); },
-  }));
+  const tabs = state.klassen.map((k) => {
+    const schule = state.schulen.find((s) => s.id === k.schuleId);
+    return el('button', {
+      class: 'tab' + (k.id === state.klasseId ? ' aktiv' : '') + (schule ? ' mit-schule' : ''),
+      text: k.name,
+      title: schule?.name || null,
+      style: schule ? { '--schulfarbe': schule.farbe } : null,
+      dataset: { id: k.id },
+      onclick: () => { if (!warGeradeGezogen()) klasseWechseln(k.id); },
+    });
+  });
   tabs.push(el('button', { class: 'tab plus', 'aria-label': 'Neue Klasse', title: 'Neue Klasse', onclick: neueKlasseDialog }, icon('plus')));
 
   const leiste = el('div', { class: 'tabs' }, tabs);
@@ -136,7 +144,7 @@ function zeichneNavi() {
   navi.replaceChildren(...ANSICHTEN.filter((a) => !a.versteckt).map((a) => el('button', {
     class: 'navi-knopf' + (aktiv === a.id ? ' aktiv' : ''),
     'aria-current': aktiv === a.id ? 'page' : null,
-    onclick: () => { state.ansicht = a.id; state.auswahl = null; state.raumId = null; neuZeichnen(); },
+    onclick: () => { state.ansicht = a.id; state.auswahl = null; state.raumId = null; state.schuleId = null; neuZeichnen(); },
   }, el('span', { class: 'navi-symbol' }, icon(a.symbol)), el('span', { text: a.name }))));
 }
 
@@ -147,8 +155,30 @@ async function klasseWechseln(id) {
   if (state.ansicht === 'person') state.ansicht = state.zurueck; // Verlauf gehört zur alten Klasse
   state.versionId = null;
   await db.speichereEinstellung('letzteKlasse', id);
-  neuZeichnen();
+  await neuZeichnen();
 }
+app.klasseWechseln = klasseWechseln;
+
+// Ist laut Stundenplan gerade eine andere Klasse dran (oder gleich, in der Pause)?
+// Dann dorthin wechseln – beim Start und nach einer längeren Pause im Hintergrund.
+// Nur im Sitzplan im Unterrichtsmodus und ohne offenes Fenster, damit nichts dazwischenfunkt.
+async function zurKlasseLautStundenplan() {
+  if (state.ansicht !== 'plan' || state.modus !== 'unterricht' || document.querySelector('dialog[open]')) return;
+  const id = klasseJetzt(state.schulen, await db.ladeStundenplan());
+  if (!id || id === state.klasseId || !state.klassen.some((k) => k.id === id)) return;
+  const vorher = aktuelleKlasse();
+  await klasseWechseln(id);
+  toast(`Laut Stundenplan: ${aktuelleKlasse().name}`, vorher
+    ? { knopf: `Zurück zu ${vorher.name}`, aktion: () => klasseWechseln(vorher.id), dauer: 5000 }
+    : {});
+}
+
+const PAUSE_FUER_WECHSEL = 5 * 60 * 1000; // so lange muss die App im Hintergrund gewesen sein
+let verstecktSeit = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { verstecktSeit = Date.now(); return; }
+  if (verstecktSeit && Date.now() - verstecktSeit >= PAUSE_FUER_WECHSEL) zurKlasseLautStundenplan();
+});
 
 // Erster Start: noch keine Klasse vorhanden
 function zeichneWillkommen(container) {
@@ -177,6 +207,7 @@ async function start() {
   automatischSperren();     // nach einer Pause im Hintergrund wieder sperren
 
   state.klassen = await db.ladeKlassen();
+  state.schulen = await db.ladeSchulen();
   const letzte = await db.ladeEinstellung('letzteKlasse');
   state.klasseId = state.klassen.some((k) => k.id === letzte) ? letzte : (state.klassen[0]?.id ?? null);
   state.lehrersicht = await db.ladeEinstellung('lehrersicht', true);
@@ -184,6 +215,7 @@ async function start() {
   state.backupFaellig = await backupErinnerung(state.klassen.length);
 
   await neuZeichnen();
+  await zurKlasseLautStundenplan();
   db.dauerhaftSpeichern(); // Browser bitten, die Daten nicht zu löschen
 
   // Bei Drehen des Handys / Größenänderung: Raster neu berechnen (leicht verzögert)

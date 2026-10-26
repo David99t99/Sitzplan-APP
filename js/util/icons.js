@@ -16,6 +16,7 @@ const SYMBOLE = {
   uebersicht: '<path d="M3.5 3.5v15a2 2 0 0 0 2 2h15"/><path d="M8.5 16v-4.5M13 16V7.5M17.5 16v-6.5"/>',
   sus: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 2.9-6 6.5-6s6.5 2.5 6.5 6"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M18.3 14.5c1.9.9 3.2 2.9 3.2 5.5"/>',
   raum: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9.5h18M9.5 9.5V21"/>',
+  kalender: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h.01M12 14h.01M16.5 14h.01M7.5 17.5h.01M12 17.5h.01"/>',
   mehr: '<path d="M4 6h9M19 6h1M4 12h1M11 12h9M4 18h7M17 18h3"/><circle cx="16" cy="6" r="2.5"/><circle cx="8" cy="12" r="2.5"/><circle cx="14" cy="18" r="2.5"/>',
 
   // Sitzplan
@@ -46,6 +47,8 @@ const SYMBOLE = {
   blitz: '<path d="M13 3L5 13.5h6L10 21l8-10.5h-6L13 3z"/>',
   speicher: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
   klasse: '<path d="M12 4L2.5 9l9.5 5 9.5-5L12 4z"/><path d="M6.5 11.5V16c1.5 1.5 3.4 2.2 5.5 2.2s4-.7 5.5-2.2v-4.5M21.5 9v5.5"/>',
+  uhr: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  schule: '<path d="M3 21h18M5 21V9.5L12 5l7 4.5V21M12 5V2.5h3M10 21v-4.5h4V21M9 12h.01M15 12h.01"/>',
   hand: '<path d="M8.5 12.5V5.5a1.5 1.5 0 0 1 3 0v5M11.5 10V4.5a1.5 1.5 0 0 1 3 0V10M14.5 10.5V6.5a1.5 1.5 0 0 1 3 0v8c0 3.9-2.6 6.5-6 6.5-2.5 0-4-1-5.3-3L4 14.3a1.5 1.5 0 0 1 2.5-1.6l2 2.3"/>',
 };
 

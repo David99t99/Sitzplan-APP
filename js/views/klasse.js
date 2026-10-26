@@ -30,6 +30,14 @@ export async function zeichneKlasse(container) {
     kartenKopf('klasse', 'Angaben zur Klasse'),
     f.elemente,
     el('button', { class: 'knopf primaer', type: 'submit', text: 'Speichern' }),
+    // Ohne Schule gibt es hier keine Auswahl – dafür den Weg dorthin
+    state.schulen.length ? null : el('div', { class: 'leiste' },
+      el('span', { class: 'hinweis wachsen', text: 'Noch keine Schule (Farbe am Tab, Stundenzeiten im Sitzplan)' }),
+      el('button', {
+        type: 'button', class: 'knopf klein',
+        onclick: () => { state.ansicht = 'stundenplan'; state.schuleId = null; app.neuZeichnen(); },
+      }, 'Schule anlegen', icon('rechts')),
+    ),
     // Der Raum wird unter "Räume" zugeteilt (dort stehen alle Räume)
     el('div', { class: 'leiste' },
       el('span', { class: 'hinweis wachsen', text: raum ? `Raum: ${raum.name}` : 'Noch kein Raum zugeteilt' }),
@@ -197,7 +205,9 @@ async function schnellbuttonsKarte() {
 // Dialog "Neue Klasse". Die Klasse kommt in einen vorhandenen Raum (dann geht es
 // gleich zu den SuS) oder bekommt einen neuen (dann zuerst die Sitzplätze antippen).
 export async function neueKlasseDialog() {
-  const f = klassenFelder({ schuljahr: aktuellesSchuljahr() });
+  // Schule vorschlagen: die der gerade geöffneten Klasse, oder die einzige
+  const schuleId = aktuelleKlasse()?.schuleId ?? (state.schulen.length === 1 ? state.schulen[0].id : null);
+  const f = klassenFelder({ schuljahr: aktuellesSchuljahr(), schuleId });
   const raeume = await db.ladeRaeume();
 
   const neuerName = el('input', { maxlength: 40, placeholder: 'z. B. Raum 12 oder EDV Nord' });
@@ -237,11 +247,17 @@ export async function neueKlasseDialog() {
   toast(neu ? 'Klasse angelegt. Tippe jetzt die Sitzplätze an.' : 'Klasse angelegt. Trage jetzt die SuS ein.', { dauer: 3500 });
 }
 
-// Die Eingabefelder einer Klasse (für Dialog und Ansicht)
+// Die Eingabefelder einer Klasse (für Dialog und Ansicht).
+// Die Auswahl "Schule" gibt es erst, wenn mindestens eine Schule angelegt ist.
 function klassenFelder(k) {
   const name = el('input', { required: true, maxlength: 30, value: k.name || '', placeholder: 'z. B. 1a GWB' });
   const fach = el('input', { value: k.fach || '', placeholder: 'z. B. Informatik' });
   const schuljahr = el('input', { value: k.schuljahr || '', placeholder: 'z. B. 2026/27' });
+  const schule = state.schulen.length ? el('select', {},
+    el('option', { value: '', text: '– keine Schule –' }),
+    state.schulen.map((s) => el('option', { value: s.id, text: s.name })),
+  ) : null;
+  if (schule) schule.value = k.schuleId || '';
   return {
     elemente: [
       feld('Name', name),
@@ -249,11 +265,13 @@ function klassenFelder(k) {
         feld('Fach (optional)', fach),
         feld('Schuljahr (optional)', schuljahr),
       ),
+      schule ? feld('Schule', schule) : null,
     ],
     werte: () => ({
       name: name.value.trim(),
       fach: fach.value.trim(),
       schuljahr: schuljahr.value.trim(),
+      ...(schule ? { schuleId: schule.value || null } : {}),
     }),
   };
 }

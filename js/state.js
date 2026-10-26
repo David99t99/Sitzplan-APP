@@ -5,7 +5,7 @@
 export const state = {
   klassen: [],          // alle Klassen (aus der Datenbank geladen)
   klasseId: null,       // die gerade geöffnete Klasse
-  ansicht: 'plan',      // 'plan' | 'uebersicht' | 'schueler' | 'raum' | 'klasse' | 'person' | 'versionen'
+  ansicht: 'plan',      // 'plan' | 'uebersicht' | 'schueler' | 'stundenplan' | 'raum' | 'klasse' | 'person' | 'versionen'
   modus: 'unterricht',  // 'unterricht' (gesperrt) | 'bearbeiten'
   lehrersicht: true,    // true = Tafel unten (Blick vom Lehrertisch)
   auswahl: null,        // im Bearbeitungsmodus angetippte Person (id)
@@ -22,11 +22,19 @@ export const state = {
   // Ab Phase 3
   versionId: null,      // in der Versionsliste aufgeklappte Version
   backupFaellig: null,  // Text der Backup-Erinnerung (oder null)
+
+  // Ab v9: Schulen und Stundenplan
+  schulen: [],               // alle Schulen (für die Farbstriche an den Klassen-Tabs)
+  schuleId: null,            // im Stundenplan geöffnete Schule (null = der Stundenplan selbst)
+  stundenplanAnsicht: 'tag', // 'tag' | 'woche'
+  stundenplanTag: null,      // gewählter Wochentag (1 = Mo … 5 = Fr, null = heute)
+  stundenplanSchule: null,   // Schule, deren Woche gezeigt wird
 };
 
-// app.js trägt hier seine Zeichenfunktion ein (vermeidet zirkuläre Importe).
+// app.js trägt hier seine Funktionen ein (vermeidet zirkuläre Importe).
 export const app = {
   neuZeichnen: async () => {},
+  klasseWechseln: async () => {},
 };
 
 // Kleine Hilfsfunktion: die gerade geöffnete Klasse

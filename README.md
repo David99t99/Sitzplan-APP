@@ -10,6 +10,7 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
 - v6: Oberfläche überarbeitet. Der Sitzplan passt am Handy ganz auf den Bildschirm (Gänge werden schmal gezeichnet, Tafel und Lehrertisch als beschriftete Blöcke), im Bearbeitungsmodus bleibt die Leiste „Ohne Platz“ unten stehen, einheitliche Symbole, eigene Sicherheitsfragen statt Browser-Fenstern, Hinweise auf den jeweils nächsten Schritt.
 - v7: Räume sind eigenständig (siehe „Räume“ unten) und ersetzen die Raumvorlagen. Die Klassen-Tabs oben lassen sich durch Ziehen umsortieren (am Handy: Tab gedrückt halten, dann ziehen).
 - v8: Abwesenheit. Im Schnellmenü „Abwesend“ antippen. Die Person erscheint an diesem Tag ausgegraut im Sitzplan („Wieder anwesend“ nimmt es zurück). Abwesenheiten stehen im Verlauf, werden in der Übersicht gezählt und sind in CSV und Backup enthalten.
+- v9: Schulen und Stundenplan (siehe unten). Jede Schule hat eine Farbe (Strich unter den Klassen-Tabs) und ihre Stundenzeiten; der Sitzplan zeigt die laufende Stunde mit „noch … Min“.
 
 ## Projektstruktur
 
@@ -30,9 +31,11 @@ js/util/icons.js        Symbole als SVG (überall gleich, statt Emojis)
 js/util/beobachtung.js  Kategorien, Zeiträume (Heute … Schuljahr), Summen, Datumsformat
 js/util/datei.js        Datei speichern (Laptop: Download, iPhone: Teilen) und Datei wählen
 js/util/sicherung.js    Backup (JSON), Prüfen beim Import, CSV, Backup-Erinnerung
+js/util/zeit.js         Uhrzeiten: welche Stunde läuft gerade, "noch … Min", mitlaufende Anzeige
 js/views/plan.js        Ansicht "Sitzplan"
 js/views/raum.js        Ansicht "Räume" (Liste aller Räume, Raster-Editor, Raum zuteilen)
 js/views/schueler.js    Ansicht "SuS"
+js/views/stundenplan.js Ansicht "Stundenplan" (Tag, Woche) und Schulen (Farbe, Stundenzeiten, Klassen)
 js/views/klasse.js      Ansicht "Mehr": Klasse, Datensicherung, PIN, Schnellbuttons + Dialog "Neue Klasse"
 js/views/schnellmenue.js  Schnellmenü im Unterrichtsmodus
 js/views/person.js      Verlauf einer Person (+ Filterleiste, Eintrag-Dialog)
@@ -110,6 +113,23 @@ Beim Update von v6 werden die Daten automatisch umgestellt: Klassen mit demselbe
 (außer es waren verschiedene Raumnamen eingetragen), aus jeder Raumvorlage wird ein Raum. Namen und Zuteilung
 lassen sich danach unter „Räume“ anpassen.
 
+## Schulen und Stundenplan
+
+Wer an mehreren Schulen unterrichtet, legt unter „Stundenplan“ für jede Schule einen Eintrag an:
+
+- **Farbe:** Jede Klasse dieser Schule bekommt oben unter ihrem Namen einen Strich in dieser Farbe
+  (z. B. gelb für die eine, rot für die andere Schule). Welche Klassen dazugehören, stellst du bei der
+  Schule ein oder unter „Mehr“ → „Angaben zur Klasse“ → „Schule“.
+- **Stundenzeiten:** Von wann bis wann jede Stunde geht (vorgeschlagen sind 50-Minuten-Stunden, bitte anpassen).
+  Im Sitzplan steht dann oben z. B. „3. Stunde 09:50–10:40 · noch 12 Min“ mit einem Balken,
+  in der Pause „Pause · 4. Stunde ab 10:45 · in 4 Min“. Dafür reicht schon die Schule – der Stundenplan
+  muss nicht ausgefüllt sein.
+- **Stundenplan:** Unter „Woche“ ein Feld antippen und die Klasse wählen. „Tag“ zeigt die Stunden eines Tages
+  mit Uhrzeiten, Pausen und Freistunden; die laufende Stunde ist markiert. Antippen öffnet die Klasse.
+- Ist laut Stundenplan gerade eine andere Klasse dran, wechselt der Sitzplan beim Öffnen der App dorthin
+  (auch nach mehr als 5 Minuten im Hintergrund). Ein Hinweis unten bietet „Zurück zu …“ an.
+- Schule löschen löscht nur ihre Stundenzeiten und ihren Stundenplan, nicht die Klassen.
+
 ## Datensicherung und Übertragung
 
 - **Backup erstellen:** „Mehr“ → „Backup erstellen“.
@@ -121,8 +141,8 @@ lassen sich danach unter „Räume“ anpassen.
   Browser, Mail an dich selbst, USB-Kabel) und dort einspielen. Umgekehrt genauso.
   Am besten immer nur auf **einem** Gerät eintragen und dann übertragen, sonst überschreibt der Import
   die Einträge des anderen Geräts.
-- Backups aus älteren App-Versionen lassen sich weiterhin einspielen. Umgekehrt nicht: Ein Backup aus v7 braucht
-  auf dem anderen Gerät ebenfalls mindestens v7 (sonst erscheint „Bitte zuerst die App aktualisieren“).
+- Backups aus älteren App-Versionen lassen sich weiterhin einspielen. Umgekehrt nicht: Ein Backup aus v9 braucht
+  auf dem anderen Gerät ebenfalls mindestens v9 (sonst erscheint „Bitte zuerst die App aktualisieren“).
 - Die PIN und die Erinnerungs-Einstellungen bleiben auf dem jeweiligen Gerät, sie sind nicht im Backup.
 - Die Backup-Datei enthält Schülerdaten und Fotos: nicht weitergeben, nicht unverschlüsselt in fremde Clouds legen.
 - **CSV für Excel:** „Übersicht“ → „Übersicht als CSV“ (Summen pro Person im gewählten Zeitraum) oder
@@ -137,7 +157,7 @@ auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v8';` erhöhen (v9, v10 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v9';` erhöhen (v10, v11 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.

@@ -14,7 +14,7 @@ export const db = new Dexie('sitzplan');
 // In der Zeichenkette stehen nur Primärschlüssel + Felder, nach denen gesucht wird.
 // Alle weiteren Felder eines Objekts werden trotzdem gespeichert.
 //
-// Klasse      { id, name, fach, schuljahr, sortierung, raumId (oder null) }
+// Klasse      { id, name, fach, schuljahr, sortierung, raumId (oder null), schuleId (oder null) }
 // Raum        { id, name, zeilen, spalten,
 //               felder: { "zeile-spalte": "sitz" | "pult" | "tafel" | "tuer" } }
 // Sitzplan    { id, klasseId, aktuell (1 = aktuell, 0 = alte Version), datum, bezeichnung,
@@ -24,6 +24,8 @@ export const db = new Dexie('sitzplan');
 // Person      { id, klasseId, vorname, nachname, foto (JPEG als Data-URL), notiz, farbe, archiviert }
 // Beobachtung { id, personId, klasseId, zeitpunkt, kategorie, wert, text }   (ab Phase 2)
 // Einstellung { schluessel, wert }
+// Schule      { id, name, farbe ("#eab308"), stunden: [{ von: "07:50", bis: "08:40" }, …] }   (ab v9)
+// Stunde      { id, schuleId, tag (1 = Mo … 5 = Fr), stunde (1 = erste Stunde), klasseId }  (ab v9)
 //
 // Hinweis: "aktuell" ist 1/0 statt true/false, weil IndexedDB nach
 // Wahrheitswerten nicht suchen kann.
@@ -54,6 +56,13 @@ db.version(2).stores({
   await tx.table('sitzplaene').bulkPut(neu.sitzplaene);
 });
 
+// Version 3 (App v9): Schulen (Farbe, Stundenzeiten) und Stundenplan.
+// Klassen ohne schuleId gehören zu keiner Schule – dafür ist keine Umstellung nötig.
+db.version(3).stores({
+  schulen: 'id',
+  stundenplan: 'id, schuleId, klasseId',
+});
+
 // Standardgröße eines neuen Rasters: 8 Spalten passen am Handy im Hochformat
 // ohne seitliches Schieben in den Raum-Editor.
 export const STANDARD_SPALTEN = 8;
@@ -76,10 +85,10 @@ export async function ladeKlassen() {
 }
 
 // Legt eine Klasse an und gleich dazu einen leeren aktuellen Sitzplan.
-export async function legeKlasseAn({ name, fach = '', schuljahr = '', raumId = null }) {
+export async function legeKlasseAn({ name, fach = '', schuljahr = '', raumId = null, schuleId = null }) {
   const alle = await db.klassen.toArray();
   const sortierung = alle.reduce((max, k) => Math.max(max, k.sortierung), 0) + 1;
-  const klasse = { id: neueId(), name, fach, schuljahr, sortierung, raumId };
+  const klasse = { id: neueId(), name, fach, schuljahr, sortierung, raumId, schuleId };
   const plan = leererPlan(klasse.id);
 
   await db.transaction('rw', db.klassen, db.sitzplaene, async () => {
@@ -93,10 +102,11 @@ export async function speichereKlasse(klasse) {
   await db.klassen.put(klasse);
 }
 
-// Löscht eine Klasse mit ALLEM, was dazugehört (SuS, Pläne, Beobachtungen).
-// Ihr Raum bleibt bestehen.
+// Löscht eine Klasse mit ALLEM, was dazugehört (SuS, Pläne, Beobachtungen, Stunden im Stundenplan).
+// Ihr Raum und ihre Schule bleiben bestehen.
 export async function loescheKlasse(klasseId) {
-  await db.transaction('rw', db.klassen, db.sitzplaene, db.personen, db.beobachtungen, async () => {
+  await db.transaction('rw', [db.klassen, db.sitzplaene, db.personen, db.beobachtungen, db.stundenplan], async () => {
+    await db.stundenplan.where('klasseId').equals(klasseId).delete();
     await db.sitzplaene.where('klasseId').equals(klasseId).delete();
     await db.personen.where('klasseId').equals(klasseId).delete();
     await db.beobachtungen.where('klasseId').equals(klasseId).delete();
@@ -185,6 +195,70 @@ export async function weiseRaumZu(klasse, raumId) {
     await db.klassen.update(klasse.id, { raumId });
     await db.sitzplaene.put(plan);
   });
+}
+
+// ============================ Schulen und Stundenplan ======================
+//
+// Eine Schule hat eine Farbe (Strich unter den Klassen-Tabs) und ihre Stundenzeiten.
+// Der Stundenplan sagt, welche Klasse an welchem Tag in welcher Stunde dran ist.
+// Die Uhrzeit steht nur bei der Schule: Stunde 3 geht so lange wie schule.stunden[2].
+
+// Stundenzeiten einer neuen Schule (50-Minuten-Stunden) – lassen sich danach anpassen
+export const STANDARD_STUNDEN = [
+  { von: '07:50', bis: '08:40' },
+  { von: '08:45', bis: '09:35' },
+  { von: '09:50', bis: '10:40' },
+  { von: '10:45', bis: '11:35' },
+  { von: '11:40', bis: '12:30' },
+  { von: '12:35', bis: '13:25' },
+];
+
+export async function ladeSchulen() {
+  const liste = await db.schulen.toArray();
+  return liste.sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }));
+}
+
+// Eine Schule, oder null (auch wenn id leer ist: Klasse ohne Schule)
+export async function ladeSchule(id) {
+  return id ? (await db.schulen.get(id)) ?? null : null;
+}
+
+export async function legeSchuleAn({ name, farbe, stunden = STANDARD_STUNDEN }) {
+  const schule = { id: neueId(), name, farbe, stunden: kopie(stunden) };
+  await db.schulen.add(schule);
+  return schule;
+}
+
+export async function speichereSchule(schule) {
+  await db.schulen.put(schule);
+}
+
+// Löscht eine Schule mit ihrem Stundenplan. Ihre Klassen bleiben, nur ohne Schule.
+export async function loescheSchule(id) {
+  await db.transaction('rw', db.schulen, db.stundenplan, db.klassen, async () => {
+    await db.stundenplan.where('schuleId').equals(id).delete();
+    await db.klassen.filter((k) => k.schuleId === id).modify({ schuleId: null });
+    await db.schulen.delete(id);
+  });
+}
+
+export async function ladeStundenplan() {
+  return db.stundenplan.toArray();
+}
+
+// Trägt eine Klasse in eine Stunde ein (klasseId = null: Stunde leeren).
+// Pro Schule, Tag und Stunde gibt es höchstens einen Eintrag.
+export async function setzeStunde({ schuleId, tag, stunde, klasseId }) {
+  await db.transaction('rw', db.stundenplan, async () => {
+    await db.stundenplan.where('schuleId').equals(schuleId)
+      .filter((e) => e.tag === tag && e.stunde === stunde).delete();
+    if (klasseId) await db.stundenplan.add({ id: neueId(), schuleId, tag, stunde, klasseId });
+  });
+}
+
+// Entfernt alle Einträge einer Schule ab dieser Stunde (wenn Stunden wegfallen)
+export async function loescheStundenAb(schuleId, stunde) {
+  await db.stundenplan.where('schuleId').equals(schuleId).filter((e) => e.stunde >= stunde).delete();
 }
 
 // ============================ Sitzpläne ====================================
@@ -393,6 +467,8 @@ export async function alleDatenLesen() {
   return {
     klassen: await db.klassen.toArray(),
     raeume: await db.raeume.toArray(),
+    schulen: await db.schulen.toArray(),
+    stundenplan: await db.stundenplan.toArray(),
     sitzplaene: await db.sitzplaene.toArray(),
     personen: await db.personen.toArray(),
     beobachtungen: await db.beobachtungen.toArray(),
@@ -403,9 +479,10 @@ export async function alleDatenLesen() {
 // Ersetzt ALLE Klassen-Daten durch die übergebenen (Import eines Backups).
 export async function alleDatenErsetzen(daten) {
   if (!daten.raeume) daten = aufRaeumeUmstellen(daten); // Backup aus der Zeit vor den Räumen
-  const tabellen = [db.klassen, db.raeume, db.sitzplaene, db.personen, db.beobachtungen, db.einstellungen];
-  await db.transaction('rw', tabellen, async () => {
-    for (const name of ['klassen', 'raeume', 'sitzplaene', 'personen', 'beobachtungen']) {
+  // Backups vor v9 haben keine Schulen und keinen Stundenplan: diese Tabellen bleiben dann leer
+  const namen = ['klassen', 'raeume', 'schulen', 'stundenplan', 'sitzplaene', 'personen', 'beobachtungen'];
+  await db.transaction('rw', [...namen.map((n) => db[n]), db.einstellungen], async () => {
+    for (const name of namen) {
       await db[name].clear();
       await db[name].bulkAdd(daten[name] || []);
     }

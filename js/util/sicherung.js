@@ -5,9 +5,10 @@ import { dateiAusgeben } from './datei.js';
 import { kategorieName } from './beobachtung.js';
 
 const FORMAT = 'sitzplan-backup';
-// 1 = bis App v6 (Raster im Sitzplan, Raumvorlagen), 2 = ab v7 (eigenständige Räume).
+// 1 = bis App v6 (Raster im Sitzplan, Raumvorlagen), 2 = ab v7 (eigenständige Räume),
+// 3 = ab v9 (Schulen und Stundenplan).
 // Ältere Backups stellt db.alleDatenErsetzen() beim Einspielen um.
-const FORMAT_VERSION = 2;
+const FORMAT_VERSION = 3;
 
 const heuteText = () => {
   const d = new Date();
