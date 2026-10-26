@@ -23,7 +23,7 @@ import {
   platzieren, freigeben, aufraeumen, zufaelligVerteilen,
 } from '../util/raster.js';
 import { ziehbarMachen, warGeradeGezogen } from '../util/ziehen.js';
-import { zeitraumGrenzen, istAbwesend, ABWESEND } from '../util/beobachtung.js';
+import { zeitraumGrenzen, istAbwesend, istPasst, ABWESEND } from '../util/beobachtung.js';
 import { oeffneSchnellmenue } from './schnellmenue.js';
 import { versionSpeichernDialog } from './versionen.js';
 import { stundeInfo, faecherHeute } from './stundenplan.js';
@@ -31,6 +31,14 @@ import { stundeInfo, faecherHeute } from './stundenplan.js';
 const LUECKE = 5;    // Abstand zwischen den Feldern in px (muss zu --luecke in app.css passen)
 const GANG = 0.35;   // Gang (Spalte/Zeile ohne Plätze): so viel von einem normalen Feld
 const FLACH = 0.6;   // Spalte/Zeile, in der nur Tafel oder Tür liegen
+
+// Laptop-Ansicht (Navigation links, "Ohne Platz" rechts neben dem Raster).
+// Diese Zahlen und die Bedingung müssen zu app.css passen ("Laptop").
+const LAPTOP = '(min-width: 1000px) and (min-height: 520px)';
+const PLAN_BREITE_LAPTOP = 1400; // .ansicht-plan darf am Laptop so breit werden
+const SEITE = 280;               // Breite der Spalte rechts (.plan-seite)
+const SEITE_ABSTAND = 16;        // Abstand zwischen Raster und Spalte
+export const istLaptop = () => matchMedia(LAPTOP).matches;
 
 export async function zeichnePlan(container) {
   const klasse = aktuelleKlasse();
@@ -123,12 +131,22 @@ export async function zeichnePlan(container) {
   });
   const spuren = (liste) => liste.map((f) => (f === 1 ? 'var(--zelle)' : `calc(var(--zelle) * ${f})`)).join(' ');
 
+  // Was neben das Raster gehört: Werkzeuge und "Ohne Platz" (Bearbeiten) bzw. der nächste
+  // Schritt und SuS ohne Platz (Unterricht). Am Laptop steht es rechts neben dem Raster,
+  // am Handy darunter.
+  const seite = bearbeiten ? seiteBearbeiten() : seiteUnterricht();
+  const laptop = istLaptop();
+  const mitSeite = seite.length > 0;
+
   const raster = el('div', {
     class: 'raster plan' + (bearbeiten ? ' bearbeiten' : '') + (gewaehlt ? ' waehlt' : ''),
     style: {
       '--zelle': zellGroesse({
-        spalten: spaltenSpuren, zeilen: zeilenSpuren, min: 44, max: 110,
-        reserve: bearbeiten ? 330 : 140, // Platz für Umschalter, Infozeile (+ Aktionen und Leiste)
+        spalten: spaltenSpuren, zeilen: zeilenSpuren, min: 44, max: 120,
+        // Platz für Umschalter und Infozeile (am Handy darunter auch Aktionen und Leiste)
+        reserve: laptop ? 110 : bearbeiten ? 330 : 140,
+        maxBreite: laptop ? PLAN_BREITE_LAPTOP : 900,
+        seite: laptop && mitSeite ? SEITE + SEITE_ABSTAND : 0,
       }) + 'px',
       'grid-template-columns': spuren(spaltenSpuren),
       'grid-template-rows': spuren(zeilenSpuren),
@@ -151,46 +169,52 @@ export async function zeichnePlan(container) {
       si += breite - 1;
     }
   });
-  container.append(el('div', { class: 'raster-huelle', dataset: { scroll: 'plan' } }, raster));
+  container.append(el('div', { class: 'plan-flaeche' + (mitSeite ? ' mit-seite' : '') },
+    el('div', { class: 'raster-huelle', dataset: { scroll: 'plan' } }, raster),
+    mitSeite ? el('aside', { class: 'plan-seite' }, seite) : null,
+  ));
+  if (!bearbeiten && personen.length > 0 && besetzt.size > 0 && heuteAlle.length === 0) {
+    container.append(el('p', { class: 'unterzeile', text: 'Person antippen, um Mitarbeit oder Verhalten einzutragen.' }));
+  }
 
-  // ---------- Unter dem Raster ----------
-  if (bearbeiten) {
+  // ======================= Hilfsfunktionen ==================================
+
+  // Bearbeiten: drei Aktionen und die Leiste "Ohne Platz"
+  function seiteBearbeiten() {
     const aktion = (symbol, text, onclick) =>
       el('button', { class: 'werkzeug', onclick }, icon(symbol), el('span', { text }));
-    container.append(
+    return [
       el('div', { class: 'werkzeuge drei' },
         aktion('wuerfel', 'Zufällig verteilen', zufall),
         aktion('merken', 'Version speichern', versionSpeichernDialog),
         aktion('verlauf', 'Versionen', () => { state.ansicht = 'versionen'; state.auswahl = null; app.neuZeichnen(); }),
       ),
       leisteOhnePlatz(),
-    );
-    return;
+    ];
   }
 
-  // Unterricht: Wenn noch etwas fehlt, den nächsten Schritt anbieten
-  if (personen.length === 0) {
-    container.append(tipp('Noch keine SuS in dieser Klasse.', 'SuS eintragen',
-      () => { state.ansicht = 'schueler'; app.neuZeichnen(); }));
-  } else if (besetzt.size === 0) {
-    container.append(tipp('Noch niemand hat einen Platz.', 'Plätze zuweisen',
-      () => { state.modus = 'bearbeiten'; app.neuZeichnen(); }));
-  } else if (heuteAlle.length === 0) {
-    container.append(el('p', { class: 'unterzeile', text: 'Person antippen, um Mitarbeit oder Verhalten einzutragen.' }));
+  // Unterricht: wenn noch etwas fehlt, der nächste Schritt – und die SuS ohne Platz
+  // (auch sie sollen im Unterricht Einträge bekommen können)
+  function seiteUnterricht() {
+    const teile = [];
+    if (personen.length === 0) {
+      teile.push(tipp('Noch keine SuS in dieser Klasse.', 'SuS eintragen',
+        () => { state.ansicht = 'schueler'; app.neuZeichnen(); }));
+    } else if (besetzt.size === 0) {
+      teile.push(tipp('Noch niemand hat einen Platz.', 'Plätze zuweisen',
+        () => { state.modus = 'bearbeiten'; app.neuZeichnen(); }));
+    }
+    if (ohnePlatz.length > 0) {
+      teile.push(el('section', { class: 'ohne-platz' },
+        el('div', { class: 'ohne-platz-kopf' }, el('h3', { text: `Ohne Platz (${ohnePlatz.length})` })),
+        el('div', { class: 'chips' }, ohnePlatz.map((p) => el('button', {
+          class: 'chip' + (istAbwesend(heute.get(p.id)) ? ' abwesend' : ''),
+          onclick: () => oeffneSchnellmenue(p, heute.get(p.id)),
+        }, avatar(p), el('span', { text: namen.get(p.id) }), marken(p.id)))),
+      ));
+    }
+    return teile;
   }
-
-  if (ohnePlatz.length > 0) {
-    // Auch SuS ohne Platz sollen im Unterricht Einträge bekommen können
-    container.append(el('section', { class: 'ohne-platz' },
-      el('div', { class: 'ohne-platz-kopf' }, el('h3', { text: `Ohne Platz (${ohnePlatz.length})` })),
-      el('div', { class: 'chips' }, ohnePlatz.map((p) => el('button', {
-        class: 'chip' + (istAbwesend(heute.get(p.id)) ? ' abwesend' : ''),
-        onclick: () => oeffneSchnellmenue(p, heute.get(p.id)),
-      }, avatar(p), el('span', { text: namen.get(p.id) }), marken(p.id)))),
-    ));
-  }
-
-  // ======================= Hilfsfunktionen ==================================
 
   // Ein Sitzplatz (frei oder besetzt)
   function sitz(key) {
@@ -293,24 +317,26 @@ export async function zeichnePlan(container) {
     );
   }
 
-  // Kleine Zähler für heute: links rot = negative, rechts grün = positive Einträge, Punkt = Notiz.
-  // Wer heute abwesend ist, bekommt links zusätzlich "abw.".
+  // Kleine Zähler für heute: links rot = negative, rechts grün = positive Einträge,
+  // blau ✓ = Mitarbeit passt, Punkt = Notiz. Wer heute abwesend ist, bekommt links zusätzlich "abw.".
   function marken(personId) {
     const liste = heute.get(personId) || [];
     const plus = liste.filter((b) => b.wert > 0).length;
     const minus = liste.filter((b) => b.wert < 0).length;
-    const notiz = liste.some((b) => b.wert === 0 && b.kategorie !== ABWESEND);
+    const passt = liste.filter(istPasst).length; // Mitarbeit ✓
+    const notiz = liste.some((b) => b.wert === 0 && b.kategorie !== ABWESEND && !istPasst(b));
     const abwesend = istAbwesend(liste);
-    if (!plus && !minus && !notiz && !abwesend) return null;
+    if (!plus && !minus && !passt && !notiz && !abwesend) return null;
     return el('span', {
       class: 'marken',
-      'aria-label': `heute ${plus} plus, ${minus} minus` + (abwesend ? ', abwesend' : ''),
+      'aria-label': `heute ${plus} plus, ${passt} passt, ${minus} minus` + (abwesend ? ', abwesend' : ''),
     },
       el('span', { class: 'marken-seite' },
         abwesend ? el('span', { class: 'marke abwesend', text: 'abw.' }) : null,
         minus ? el('span', { class: 'marke negativ', text: '−' + minus }) : null),
       el('span', { class: 'marken-seite rechts' },
         plus ? el('span', { class: 'marke positiv', text: '+' + plus }) : null,
+        passt ? el('span', { class: 'marke passt', text: passt > 1 ? '✓' + passt : '✓' }) : null,
         notiz ? el('span', { class: 'marke neutral', title: 'Notiz' }) : null),
     );
   }
@@ -379,13 +405,15 @@ export function sichtKnopf(nurSymbol = false) {
 //   spalten / zeilen: je Spalte bzw. Zeile ein Faktor (1 = volles Feld, kleiner = Gang).
 // Wird "zeilen" angegeben, muss es auch in die Höhe passen (wichtig im Querformat);
 // "reserve" ist der Platz in px, den Umschalter, Leisten usw. in der Höhe brauchen.
+// "maxBreite": so breit darf die Ansicht werden; "seite": so viel davon braucht die
+// Spalte rechts neben dem Raster (Laptop).
 // Nie kleiner als "min" (Touch-Fläche), nie größer als "max".
-export function zellGroesse({ spalten, zeilen = null, min, max, reserve = 0 }) {
+export function zellGroesse({ spalten, zeilen = null, min, max, reserve = 0, maxBreite = 900, seite = 0 }) {
   const inhalt = document.getElementById('inhalt');
   const passt = (platz, spuren) =>
     Math.floor((platz - (spuren.length - 1) * LUECKE) / spuren.reduce((summe, f) => summe + f, 0));
-  // Die Ansicht ist höchstens 900 px breit (.ansicht); neben dem Raster bleiben je 6 px Rand (.raster-huelle)
-  let groesse = passt(Math.min(inhalt.clientWidth, 900) - 12, spalten);
+  // Die Ansicht ist höchstens maxBreite breit (.ansicht); neben dem Raster bleiben je 6 px Rand (.raster-huelle)
+  let groesse = passt(Math.min(inhalt.clientWidth, maxBreite) - 12 - seite, spalten);
   if (zeilen) groesse = Math.min(groesse, passt(inhalt.clientHeight - reserve, zeilen));
   return Math.max(min, Math.min(max, groesse));
 }

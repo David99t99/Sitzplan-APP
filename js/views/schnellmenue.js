@@ -10,11 +10,19 @@ import * as db from '../db.js';
 import { el, toast, avatar, vollerName } from '../util/ui.js';
 import { icon } from '../util/icons.js';
 import { kategorieName, wertZeichen, uhrzeitText, ABWESEND } from '../util/beobachtung.js';
+import { stundenBeginn } from '../util/zeit.js';
 
 // person:      die angetippte Person
 // heute:       ihre Einträge von heute (für die Anzeige im Kopf)
 export async function oeffneSchnellmenue(person, heute = []) {
-  const schnellbuttons = (await db.ladeSchnellbuttons()).filter((s) => !s.geloescht);
+  const klasse = state.klassen.find((k) => k.id === person.klasseId);
+  const [alleButtons, schule] = await Promise.all([db.ladeSchnellbuttons(), db.ladeSchule(klasse?.schuleId)]);
+  const schnellbuttons = alleButtons.filter((s) => !s.geloescht);
+
+  // "Diese Stunde": seit Beginn der laufenden (oder zuletzt begonnenen) Stunde laut den
+  // Stundenzeiten der Schule. Ohne Stundenzeiten zählt der ganze Tag.
+  const beginn = schule ? stundenBeginn(schule.stunden) : null;
+  const dieseStunde = heute.filter((b) => !beginn || new Date(b.zeitpunkt) >= beginn);
 
   const dialog = el('dialog', { class: 'dialog blatt', 'aria-label': 'Beobachtung für ' + vollerName(person) });
   const schliessen = () => dialog.close();
@@ -24,7 +32,7 @@ export async function oeffneSchnellmenue(person, heute = []) {
     schliessen();
     const b = await db.legeBeobachtungAn({ personId: person.id, klasseId: person.klasseId, kategorie, wert, text });
     await app.neuZeichnen();
-    toast(`${person.vorname}: ${kategorieName(kategorie, schnellbuttons)} ${wertZeichen(wert)}`, {
+    toast(`${person.vorname}: ${kategorieName(kategorie, schnellbuttons)} ${wertZeichen(wert, kategorie)}`, {
       knopf: 'Rückgängig',
       dauer: 5000,
       aktion: async () => {
@@ -53,11 +61,35 @@ export async function oeffneSchnellmenue(person, heute = []) {
     });
   }
 
-  // Zeile "Mitarbeit  [ + ] [ − ]"
-  const plusMinus = (kategorie) => el('div', { class: 'pm-zeile' },
+  // Versehen beim Eintragen: alle Einträge dieser Person aus dieser Stunde auf einmal löschen
+  // (mit "Rückgängig", falls es doch Absicht war)
+  async function stundeZuruecksetzen() {
+    schliessen();
+    await db.loescheBeobachtungen(dieseStunde.map((b) => b.id));
+    await app.neuZeichnen();
+    toast(`${person.vorname}: ${dieseStunde.length === 1 ? '1 Eintrag' : dieseStunde.length + ' Einträge'} gelöscht`, {
+      knopf: 'Rückgängig',
+      dauer: 6000,
+      aktion: async () => {
+        await db.speichereBeobachtungen(dieseStunde);
+        await app.neuZeichnen();
+        toast('Wiederhergestellt.');
+      },
+    });
+  }
+
+  // Zeile "Mitarbeit  [ + ] [ ✓ ] [ − ]" – ✓ = passt, nichts Auffälliges (zählt nicht in die Summe).
+  // Verhalten hat nur + und −.
+  const plusMinus = (kategorie, mitPasst = false) => el('div', { class: 'pm-zeile' },
     el('span', { class: 'pm-titel', text: kategorieName(kategorie, schnellbuttons) }),
-    el('button', { class: 'pm plus', 'aria-label': kategorieName(kategorie, []) + ' plus', onclick: () => eintragen(kategorie, 1) }, icon('plus')),
-    el('button', { class: 'pm minus', 'aria-label': kategorieName(kategorie, []) + ' minus', onclick: () => eintragen(kategorie, -1) }, icon('minus')),
+    el('div', { class: 'pm-knoepfe' },
+      el('button', { class: 'pm plus', 'aria-label': kategorieName(kategorie, []) + ' plus', onclick: () => eintragen(kategorie, 1) }, icon('plus')),
+      mitPasst ? el('button', {
+        class: 'pm passt', title: 'passt, nichts Auffälliges',
+        'aria-label': kategorieName(kategorie, []) + ' passt', onclick: () => eintragen(kategorie, 0),
+      }, icon('haken')) : null,
+      el('button', { class: 'pm minus', 'aria-label': kategorieName(kategorie, []) + ' minus', onclick: () => eintragen(kategorie, -1) }, icon('minus')),
+    ),
   );
 
   // Notiz: Enter oder Knopf speichert
@@ -72,8 +104,8 @@ export async function oeffneSchnellmenue(person, heute = []) {
   const heuteListe = heute.length
     ? el('p', { class: 'heute-liste' },
       'Heute: ',
-      heute.slice(0, 6).map((b) => el('span', { class: 'heute-eintrag ' + wertKlasse(b.wert) },
-        `${uhrzeitText(b.zeitpunkt)} ${kategorieName(b.kategorie, schnellbuttons)} ${wertZeichen(b.wert)}`)),
+      heute.slice(0, 6).map((b) => el('span', { class: 'heute-eintrag ' + wertKlasse(b.wert, b.kategorie) },
+        `${uhrzeitText(b.zeitpunkt)} ${kategorieName(b.kategorie, schnellbuttons)} ${wertZeichen(b.wert, b.kategorie)}`)),
       heute.length > 6 ? ` … (+${heute.length - 6})` : '')
     : el('p', { class: 'heute-liste', text: 'Heute noch keine Einträge.' });
 
@@ -97,8 +129,16 @@ export async function oeffneSchnellmenue(person, heute = []) {
       }, icon('verlauf'), 'Verlauf'),
       el('button', { class: 'knopf rund leise', 'aria-label': 'Schließen', onclick: schliessen }, icon('x')),
     ),
-    heuteListe,
-    plusMinus('mitarbeit'),
+    // Heutige Einträge, daneben gleich sichtbar: alles aus dieser Stunde löschen
+    el('div', { class: 'heute-zeile' },
+      heuteListe,
+      dieseStunde.length ? el('button', {
+        class: 'knopf klein gefahr-leise',
+        title: beginn ? `Alle Einträge seit ${uhrzeitText(beginn.toISOString())} löschen` : 'Alle Einträge von heute löschen',
+        onclick: stundeZuruecksetzen,
+      }, icon('papierkorb'), `${beginn ? 'Diese Stunde' : 'Heute'} löschen (${dieseStunde.length})`) : null,
+    ),
+    plusMinus('mitarbeit', true),
     plusMinus('verhalten'),
     schnellbuttons.length ? el('div', { class: 'sb-raster' },
       schnellbuttons.map((s) => el('button', {
@@ -126,6 +166,8 @@ export async function oeffneSchnellmenue(person, heute = []) {
   dialog.querySelector('.knopf.rund').focus();
 }
 
-export function wertKlasse(wert) {
+// CSS-Klasse für die Farbe eines Eintrags; Mitarbeit ✓ (wert 0) hat eine eigene
+export function wertKlasse(wert, kategorie = '') {
+  if (wert === 0 && kategorie === 'mitarbeit') return 'passt';
   return wert > 0 ? 'positiv' : wert < 0 ? 'negativ' : 'neutral';
 }

@@ -373,6 +373,15 @@ export async function loescheBeobachtung(id) {
   await db.beobachtungen.delete(id);
 }
 
+// Mehrere auf einmal löschen bzw. (für "Rückgängig") wieder speichern
+export async function loescheBeobachtungen(ids) {
+  await db.beobachtungen.bulkDelete(ids);
+}
+
+export async function speichereBeobachtungen(liste) {
+  await db.beobachtungen.bulkPut(liste);
+}
+
 // Alle Beobachtungen einer Klasse ab einem Zeitpunkt (ISO-Text oder null = alle), neueste zuerst
 export async function ladeBeobachtungenKlasse(klasseId, ab = null, bis = null) {
   const liste = await db.beobachtungen.where('klasseId').equals(klasseId).toArray();

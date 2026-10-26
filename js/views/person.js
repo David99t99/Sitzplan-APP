@@ -50,10 +50,12 @@ export async function zeichnePerson(container) {
     onclick: () => { f.kategorie = f.kategorie === kategorie ? 'alle' : kategorie; app.neuZeichnen(); },
   }, el('span', { class: 'kachel-titel', text: titel }), inhalt);
 
+  // "+2 −1 = +1", bei Mitarbeit dazu die ✓ ("+2 ✓3 −1 = +1")
   const pm = (k) => {
-    const x = s[k] || { plus: 0, minus: 0, summe: 0 };
+    const x = s[k] || { plus: 0, neutral: 0, minus: 0, summe: 0 };
     return el('span', { class: 'kachel-wert' },
       el('span', { class: 'positiv', text: '+' + x.plus }), ' ',
+      k === 'mitarbeit' ? [el('span', { class: 'passt', text: '✓' + x.neutral }), ' '] : null,
       el('span', { class: 'negativ', text: '−' + x.minus }), ' ',
       el('strong', { text: '= ' + summeText(x.summe) }));
   };
@@ -98,7 +100,7 @@ export async function zeichnePerson(container) {
         class: 'zeile eintrag',
         onclick: async () => { if (await eintragDialog({ ...b }, schnellbuttons, false)) app.neuZeichnen(); },
       },
-        el('span', { class: 'eintrag-zeichen ' + wertKlasse(b.wert), text: wertZeichen(b.wert) }),
+        el('span', { class: 'eintrag-zeichen ' + wertKlasse(b.wert, b.kategorie), text: wertZeichen(b.wert, b.kategorie) }),
         el('span', { class: 'zeile-text' },
           el('strong', { text: kategorieName(b.kategorie, schnellbuttons) }),
           b.text ? el('small', { text: b.text }) : null,
@@ -145,12 +147,19 @@ async function eintragDialog(b, schnellbuttons, istNeu) {
 
   const kategorie = el('select', {}, kategorien.map((k) =>
     el('option', { value: k.id, selected: k.id === b.kategorie, text: k.name })));
+  const neutral = el('option', { value: '0', selected: b.wert === 0 });
   const wert = el('select', {},
     el('option', { value: '1', selected: b.wert > 0, text: '+ positiv' }),
     el('option', { value: '-1', selected: b.wert < 0, text: '− negativ' }),
-    el('option', { value: '0', selected: b.wert === 0, text: '• neutral (zählt nicht)' }));
+    neutral);
+  // Wert 0 heißt bei Mitarbeit "✓ passt", sonst "neutral"
+  const neutralText = () => {
+    neutral.textContent = kategorie.value === 'mitarbeit' ? '✓ passt (zählt nicht)' : '• neutral (zählt nicht)';
+  };
+  neutralText();
   // Beim Wechsel der Kategorie den passenden Wert vorschlagen
   kategorie.addEventListener('change', () => {
+    neutralText();
     const sb = schnellbuttons.find((s) => 'sb-' + s.id === kategorie.value);
     if (sb) wert.value = String(sb.wert);
     else if (kategorie.value === 'notiz' || kategorie.value === ABWESEND) wert.value = '0';

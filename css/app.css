@@ -822,9 +822,71 @@ select {
   .plan-kopf .plan-info { flex: 1; min-width: 0; }
 }
 
+/* ------------------------------------------------------------ Sitzplan: Raster + Spalte daneben
+   Am Handy fließen Raster und Spalte einfach untereinander (display: contents),
+   am Laptop steht die Spalte rechts neben dem Raster (siehe unten). */
+.plan-flaeche, .plan-seite { display: contents; }
+
+/* ============================================================ Laptop
+   Breites Fenster mit genug Höhe (z. B. 15"-Laptop, 1536 × 780): Am Laptop ist die
+   HÖHE knapp, deshalb wandert die Navigation nach links, der Kopf des Sitzplans wird
+   einzeilig und "Ohne Platz" steht rechts neben dem Raster statt darunter.
+   Die Bedingung steht auch in plan.js (LAPTOP) – beide gleich halten! */
+@media (min-width: 1000px) and (min-height: 520px) {
+  body {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "navi kopf" "navi inhalt";
+  }
+  #kopf { grid-area: kopf; }
+  #inhalt { grid-area: inhalt; }
+  #navi {
+    grid-area: navi;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    width: 92px;
+    padding: 10px 6px;
+    border-top: 0;
+    border-right: 1px solid var(--rand);
+  }
+  .navi-knopf { flex: none; min-height: 66px; font-size: .74rem; letter-spacing: 0; }
+  #toast { bottom: 24px; }
+
+  /* Sitzplan: darf breiter werden, Kopf in einer Zeile */
+  .ansicht-plan { max-width: 1400px; }
+  .plan-kopf { flex-direction: row; align-items: center; gap: 16px; margin-bottom: 0; }
+  .plan-kopf .umschalter { flex: 0 0 320px; }
+  .plan-kopf .plan-info { flex: 1; min-width: 0; }
+
+  /* Raster links, Spalte rechts (280 px wie SEITE in plan.js) */
+  .plan-flaeche { display: block; }
+  .plan-flaeche.mit-seite { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+  .plan-seite {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    max-height: calc(100dvh - 150px);
+    overflow-y: auto;
+    padding: 6px 2px;
+  }
+  /* In der Spalte muss die Leiste nicht unten kleben, und die SuS dürfen umbrechen */
+  .plan-seite .ohne-platz.haftend { position: static; box-shadow: var(--schatten); }
+  .plan-seite .chips.reihe { flex-wrap: wrap; max-height: none; overflow: visible; margin: 0; padding: 0; }
+  .plan-seite .ohne-platz-kopf { flex-wrap: wrap; }
+  .plan-seite .ohne-platz-kopf .hinweis { text-align: left; flex-basis: 100%; }
+  /* Die drei Aktionen untereinander: Symbol links, Text rechts */
+  .plan-seite .werkzeuge.drei { grid-template-columns: 1fr; gap: 6px; }
+  .plan-seite .werkzeug { flex-direction: row; justify-content: flex-start; min-height: 46px; padding: 0 14px; gap: 10px; font-size: .9rem; }
+}
+
 /* ============================================================ Beobachtungen */
 
 .positiv { color: var(--positiv); }
+.passt { color: var(--akzent); }        /* Mitarbeit ✓ */
 .negativ { color: var(--negativ); }
 .neutral { color: var(--neutral); }
 .wachsen { flex: 1; min-width: 0; margin: 0; }
@@ -864,6 +926,7 @@ select {
 }
 .marke.positiv { background: var(--positiv-fuellung); color: #fff; }
 .marke.negativ { background: var(--negativ-fuellung); color: #fff; }
+.marke.passt { background: var(--akzent-fuellung); color: #fff; }
 .marke.neutral { background: var(--neutral); color: #fff; min-width: 0; width: .8em; height: .8em; padding: 0; margin: .15em; }
 
 .marke.abwesend { background: var(--neutral); }
@@ -905,8 +968,15 @@ select {
 .blatt-name small { color: var(--leise); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .heute-liste { margin: 0; font-size: .85rem; color: var(--leise); display: flex; flex-wrap: wrap; gap: 4px 8px; }
 .heute-eintrag { white-space: nowrap; }
+/* Heutige Einträge links, "Diese Stunde löschen" rechts daneben (am Handy notfalls darunter) */
+.heute-zeile { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.heute-zeile .heute-liste { flex: 1 1 200px; }
+.heute-zeile .knopf { flex: none; min-height: 40px; }
 
-.pm-zeile { display: grid; grid-template-columns: minmax(0, 1fr) 1fr 1fr; gap: 8px; align-items: center; }
+/* Titel links, rechts die Knöpfe: Mitarbeit + ✓ −, Verhalten + − (gleich breit verteilt) */
+.pm-zeile { display: grid; grid-template-columns: minmax(0, 1fr) 2fr; gap: 8px; align-items: center; }
+.pm-knoepfe { display: flex; gap: 8px; }
+.pm-knoepfe .pm { flex: 1; min-width: 0; }
 .pm-titel { font-weight: 700; font-size: 1.02rem; }
 .pm {
   min-height: 66px;               /* große Daumenfläche */
@@ -920,6 +990,7 @@ select {
 }
 .pm .icon { width: 30px; height: 30px; stroke-width: 3; }
 .pm.plus { background: var(--positiv-fuellung); }
+.pm.passt { background: var(--akzent-fuellung); }   /* ✓ passt, nichts Auffälliges */
 .pm.minus { background: var(--negativ-fuellung); }
 .pm:active { transform: scale(.95); filter: brightness(.92); }
 
@@ -989,6 +1060,7 @@ select {
 }
 .eintrag-zeichen.positiv { background: var(--positiv-hell); }
 .eintrag-zeichen.negativ { background: var(--negativ-hell); }
+.eintrag-zeichen.passt { background: var(--akzent-hell); }
 .eintrag-zeit { color: var(--leise); font-variant-numeric: tabular-nums; font-size: .9rem; }
 
 /* ------------------------------------------------------------ Klassenübersicht */

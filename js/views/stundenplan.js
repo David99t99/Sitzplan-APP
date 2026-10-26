@@ -694,7 +694,8 @@ export function stundeInfo(schule, ort, zusatz = '', faecher = new Map()) {
     if (!lage) { e.replaceChildren([ort, zusatz].filter(Boolean).join(' · ')); return; }
     const stunde = lage.art === 'stunde';
     const fach = faecher.get(lage.nr);
-    e.replaceChildren(
+    // filter(Boolean): replaceChildren() schriebe ein fehlendes Teil sonst als Text "null" hin
+    e.replaceChildren(...[
       el('span', { class: 'stunde-zeit' }, fach ? fachEtikett(fach, 'kurz') : icon('uhr'),
         stunde ? `${lage.nr}. Stunde ${lage.von}–${lage.bis}`
           : `${lage.art === 'pause' ? 'Pause · ' : ''}${lage.nr}. Stunde ab ${lage.von}`),
@@ -702,7 +703,7 @@ export function stundeInfo(schule, ort, zusatz = '', faecher = new Map()) {
       zusatz ? el('span', { class: 'stunde-zusatz', text: '· ' + zusatz }) : null,
       ort ? el('span', { class: 'stunde-ort', text: '· ' + ort }) : null,
       stunde ? el('span', { class: 'stunde-balken', style: { '--anteil': lage.anteil } }) : null,
-    );
+    ].filter(Boolean));
   });
 }
 

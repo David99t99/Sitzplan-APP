@@ -74,6 +74,22 @@ export function stundeJetzt(stunden, jetzt = new Date()) {
   return null;
 }
 
+// Wann hat die laufende (oder zuletzt begonnene) Stunde heute begonnen? Als Date, oder null
+// (Wochenende, vor der ersten Stunde, keine Stundenzeiten). Für "Einträge dieser Stunde".
+export function stundenBeginn(stunden, jetzt = new Date()) {
+  if (wochentag(jetzt) > 5) return null;
+  const sek = sekunden(jetzt);
+  let beginn = null;
+  for (const s of stunden) {
+    const von = minuten(s.von);
+    if (von !== null && von * 60 <= sek && (beginn === null || von > beginn)) beginn = von;
+  }
+  if (beginn === null) return null;
+  const d = new Date(jetzt);
+  d.setHours(Math.floor(beginn / 60), beginn % 60, 0, 0);
+  return d;
+}
+
 // ----------------------------------------------------------------- Mitlaufende Anzeige
 //
 // Ein Element, das mit der Uhr mitgeht ("noch 12 Min"), ohne dass die ganze Seite

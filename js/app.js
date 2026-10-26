@@ -44,7 +44,8 @@ async function neuZeichnen() {
   zeichneNavi();
 
   const ansicht = ANSICHTEN.find((a) => a.id === state.ansicht) || ANSICHTEN[0];
-  const neu = el('div', { class: 'ansicht' + (ansicht.breit ? ' breit' : '') });
+  // "ansicht-plan" usw.: damit z. B. der Sitzplan am Laptop breiter werden darf (app.css)
+  const neu = el('div', { class: `ansicht ansicht-${ansicht.id}` + (ansicht.breit ? ' breit' : '') });
   if (!aktuelleKlasse()) {
     zeichneWillkommen(neu);
   } else {

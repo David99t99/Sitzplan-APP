@@ -44,6 +44,7 @@ export async function zeichneUebersicht(container) {
       w[k + '-minus'] = s[k]?.minus || 0;
       w[k + '-summe'] = s[k]?.summe || 0;
     }
+    w['mitarbeit-passt'] = s.mitarbeit?.neutral || 0; // Mitarbeit ✓
     for (const sb of buttons) w['sb-' + sb.id] = s['sb-' + sb.id]?.anzahl || 0;
     w.abwesend = s.abwesend?.anzahl || 0;
     w.notiz = s.notiz?.anzahl || 0;
@@ -76,16 +77,16 @@ export async function zeichneUebersicht(container) {
   const thead = el('thead', {},
     el('tr', {},
       kopf('name', 'Name', { rowspan: 2 }),
-      el('th', { colspan: 3, class: 'gruppe', text: 'Mitarbeit' }),
+      el('th', { colspan: 4, class: 'gruppe', text: 'Mitarbeit' }),
       el('th', { colspan: 3, class: 'gruppe', text: 'Verhalten' }),
       buttons.map((sb) => kopf('sb-' + sb.id, sb.name, { rowspan: 2 })),
       kopf('abwesend', 'Abwesend', { rowspan: 2 }),
       kopf('notiz', 'Notizen', { rowspan: 2 }),
     ),
     el('tr', {},
-      ['mitarbeit', 'verhalten'].flatMap((k) => [
-        kopf(k + '-plus', '+'), kopf(k + '-minus', '−'), kopf(k + '-summe', 'Σ'),
-      ]),
+      kopf('mitarbeit-plus', '+'), kopf('mitarbeit-passt', '✓', { title: 'passt, nichts Auffälliges' }),
+      kopf('mitarbeit-minus', '−'), kopf('mitarbeit-summe', 'Σ'),
+      kopf('verhalten-plus', '+'), kopf('verhalten-minus', '−'), kopf('verhalten-summe', 'Σ'),
     ),
   );
   // Die Name-Spalte braucht beide Klassen (sortierbar + fixiert)
@@ -102,7 +103,8 @@ export async function zeichneUebersicht(container) {
   },
     el('th', { scope: 'row', class: 'name-spalte' },
       el('span', { class: 'name-zelle' }, avatar(person), el('span', { text: w.name }))),
-    zahl(w['mitarbeit-plus'], 'positiv'), zahl(w['mitarbeit-minus'], 'negativ'), summeZelle(w['mitarbeit-summe']),
+    zahl(w['mitarbeit-plus'], 'positiv'), zahl(w['mitarbeit-passt'], 'passt'),
+    zahl(w['mitarbeit-minus'], 'negativ'), summeZelle(w['mitarbeit-summe']),
     zahl(w['verhalten-plus'], 'positiv'), zahl(w['verhalten-minus'], 'negativ'), summeZelle(w['verhalten-summe']),
     buttons.map((sb) => zahl(w['sb-' + sb.id])),
     zahl(w.abwesend),
@@ -118,11 +120,11 @@ export async function zeichneUebersicht(container) {
       el('button', {
         class: 'knopf klein',
         onclick: () => csvUebersicht(klasse,
-          ['Nachname', 'Vorname', 'Mitarbeit +', 'Mitarbeit −', 'Mitarbeit Summe',
+          ['Nachname', 'Vorname', 'Mitarbeit +', 'Mitarbeit ✓', 'Mitarbeit −', 'Mitarbeit Summe',
             'Verhalten +', 'Verhalten −', 'Verhalten Summe', ...buttons.map((sb) => sb.name), 'Abwesend', 'Notizen',
             'Zeitraum'],
           zeilen.map(({ person, w }) => [person.nachname, person.vorname,
-            w['mitarbeit-plus'], w['mitarbeit-minus'], w['mitarbeit-summe'],
+            w['mitarbeit-plus'], w['mitarbeit-passt'], w['mitarbeit-minus'], w['mitarbeit-summe'],
             w['verhalten-plus'], w['verhalten-minus'], w['verhalten-summe'],
             ...buttons.map((sb) => w['sb-' + sb.id]), w.abwesend, w.notiz, zeitraumName()])),
       }, icon('herunter'), 'Übersicht als CSV'),

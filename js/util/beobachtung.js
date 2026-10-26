@@ -18,6 +18,10 @@ export function istAbwesend(eintraege = []) {
   return eintraege.some((b) => b.kategorie === ABWESEND);
 }
 
+// Mitarbeit hat drei Stufen: + (wert 1), ✓ "passt, nichts Auffälliges" (wert 0) und − (wert −1).
+// ✓ zählt nicht in die Summe, wird aber mitgezählt (summen(): "neutral").
+export const istPasst = (b) => b.kategorie === 'mitarbeit' && b.wert === 0;
+
 // Lesbarer Name einer Kategorie (auch für Schnellbuttons)
 export function kategorieName(kategorie, schnellbuttons) {
   if (KATEGORIEN[kategorie]) return KATEGORIEN[kategorie];
@@ -98,13 +102,15 @@ export function imZeitraum(b, { ab, bis }) {
 
 // ----------------------------------------------------------------- Summen
 //
-// Ergebnis: { mitarbeit: { plus: 3, minus: 1, summe: 2 }, 'sb-hue': { …, anzahl: 2 }, … }
+// Ergebnis: { mitarbeit: { plus: 3, neutral: 2, minus: 1, summe: 2 }, 'sb-hue': { …, anzahl: 2 }, … }
+// "neutral" zählt die Einträge mit wert 0 (bei Mitarbeit: ✓).
 export function summen(beobachtungen) {
   const s = {};
   for (const b of beobachtungen) {
-    const k = (s[b.kategorie] ||= { plus: 0, minus: 0, summe: 0, anzahl: 0 });
+    const k = (s[b.kategorie] ||= { plus: 0, neutral: 0, minus: 0, summe: 0, anzahl: 0 });
     k.anzahl++;
     if (b.wert > 0) k.plus++;
+    if (b.wert === 0) k.neutral++;
     if (b.wert < 0) k.minus++;
     k.summe += b.wert;
   }
@@ -118,8 +124,9 @@ export function summeText(n) {
   return n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '0';
 }
 
-// "+", "−" oder "•"
-export function wertZeichen(wert) {
+// "+", "−" oder "•" – bei Mitarbeit steht für wert 0 das "✓"
+export function wertZeichen(wert, kategorie = '') {
+  if (wert === 0 && kategorie === 'mitarbeit') return '✓';
   return wert > 0 ? '+' : wert < 0 ? '−' : '•';
 }
 

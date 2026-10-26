@@ -12,6 +12,8 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
 - v8: Abwesenheit. Im Schnellmenü „Abwesend“ antippen. Die Person erscheint an diesem Tag ausgegraut im Sitzplan („Wieder anwesend“ nimmt es zurück). Abwesenheiten stehen im Verlauf, werden in der Übersicht gezählt und sind in CSV und Backup enthalten.
 - v9: Schulen und Stundenplan (siehe unten). Jede Schule hat eine Farbe (Strich unter den Klassen-Tabs) und ihre Stundenzeiten; der Sitzplan zeigt die laufende Stunde mit „noch … Min“.
 - v10: Fächer im Stundenplan. Jede Stunde lässt sich als Informatik, GWB … markieren (Kürzel und Farbe), das Wochenraster zeigt die Stunden in der Fachfarbe. Dazu kleinere Design-Verbesserungen: eine Leiste „Mo–Fr | Woche“ statt zwei, Übersicht am Laptop mittig, kompakterer Kopf im Verlauf.
+- v11: Eigenes Layout für den Laptop (ab 1000 px Fensterbreite): Navigation links statt unten, Kopf des Sitzplans in einer Zeile, „Ohne Platz“ und die Bearbeiten-Aktionen rechts neben dem Raster. Der Sitzplan passt so ohne Scrollen auf den Bildschirm und die Plätze werden größer. Am Handy bleibt alles wie bisher.
+  Mitarbeit hat jetzt drei Knöpfe: + / ✓ / − (✓ = passt, nichts Auffälliges; zählt nicht in die Summe, steht aber als eigene Spalte in Übersicht und CSV). Im Schnellmenü löscht „Diese Stunde löschen“ alle Einträge der Person seit Beginn der laufenden Stunde (mit „Rückgängig“).
 
 ## Projektstruktur
 
@@ -94,6 +96,12 @@ Die GitHub-Pages-Adresse in **Edge oder Chrome** öffnen und rechts in der Adres
 eigenen Fenster, auch offline. Am Laptop funktioniert alles mit der Maus: Ziehen,
 Anklicken, Escape schließt Fenster.
 
+Ab einer Fensterbreite von 1000 px nutzt die App ein eigenes Laptop-Layout: Die Navigation
+steht links, und neben dem Sitzplan steht rechts eine Spalte mit „Ohne Platz“ (beim Bearbeiten
+auch „Zufällig verteilen“, „Version speichern“, „Versionen“). Ausgelegt ist es auf einen
+15"-Laptop mit Full HD und 125 % Skalierung (Fenster etwa 1536 × 780). Ist das Fenster
+schmaler, erscheint die Handy-Ansicht.
+
 **Wichtig:** Laptop und iPhone haben **getrennte Daten**, weil alles lokal gespeichert wird
 und es absichtlich keine Cloud gibt. Übertragen geht mit einer Backup-Datei (siehe unten).
 
@@ -162,7 +170,7 @@ auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v10';` erhöhen (v11, v12 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v11';` erhöhen (v12, v13 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.
