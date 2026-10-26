@@ -17,6 +17,7 @@ import { zeichneVersionen } from './views/versionen.js';
 import { zeichneStundenplan, klasseJetzt } from './views/stundenplan.js';
 import { sperren, automatischSperren } from './views/sperre.js';
 import { backupErinnerung, erinnerungVerschieben } from './util/sicherung.js';
+import * as autobackup from './util/autobackup.js';
 
 // Die Ansichten. "versteckt" = erscheint nicht in der unteren Navigation.
 // "breit" = darf am Laptop die ganze Breite nutzen (Tabellen).
@@ -124,7 +125,7 @@ function zeichneKopf() {
   if (state.backupFaellig) {
     kopf.append(el('div', { class: 'banner' },
       el('span', { class: 'wachsen' }, icon('sicherung'), state.backupFaellig),
-      el('button', { class: 'knopf klein primaer', text: 'Jetzt sichern', onclick: backupErstellen }),
+      el('button', { class: 'knopf klein primaer', text: 'Jetzt sichern', onclick: jetztSichern }),
       el('button', {
         class: 'knopf klein', text: 'Später',
         onclick: async () => { await erinnerungVerschieben(3); state.backupFaellig = null; neuZeichnen(); },
@@ -179,7 +180,57 @@ let verstecktSeit = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { verstecktSeit = Date.now(); return; }
   if (verstecktSeit && Date.now() - verstecktSeit >= PAUSE_FUER_WECHSEL) zurKlasseLautStundenplan();
+  autoBackupPruefen();
 });
+
+// ---------------------------------------------------------------------------
+// Automatisches Backup in einen Ordner (Laptop, siehe util/autobackup.js).
+// Geprüft wird beim Start, beim Zurückkommen in die App und stündlich (falls die
+// App am Laptop tagelang offen bleibt). Fehlt die Erlaubnis für den Ordner, zeigt
+// der Hinweis oben einen Knopf – erst nach einem Klick darf der Browser fragen.
+// ---------------------------------------------------------------------------
+let autoBackupLaeuft = false;
+async function autoBackupPruefen() {
+  if (autoBackupLaeuft || !await autobackup.faellig()) return;
+  autoBackupLaeuft = true;
+  try {
+    const ergebnis = await autobackup.sichern();
+    // Hat man beim Hinweis "Später" gewählt, bleibt er so lange weg (gesichert wird trotzdem, wenn es geht)
+    const spaeter = await db.ladeEinstellung('backupErinnerungBis');
+    if (ergebnis !== 'ok' && spaeter && Date.parse(spaeter) > Date.now()) return;
+    if (ergebnis === 'ok') {
+      state.backupFaellig = null;
+      toast('Automatisches Backup gespeichert.');
+    } else if (ergebnis === 'erlaubnis') {
+      state.backupFaellig = 'Automatisches Backup: Bitte einmal den Zugriff auf den Ordner erlauben.';
+    } else if (ergebnis === 'fehler') {
+      state.backupFaellig = 'Automatisches Backup hat nicht geklappt – gibt es den Ordner noch? (Mehr → Automatisches Backup)';
+    }
+    zeichneKopf();
+  } finally {
+    autoBackupLaeuft = false;
+  }
+}
+setInterval(autoBackupPruefen, 60 * 60 * 1000);
+
+// "Jetzt sichern" im Hinweis oben: mit Backup-Ordner dorthin (der Klick erlaubt die
+// Nachfrage nach dem Zugriff), sonst wie bisher als Download bzw. Teilen.
+async function jetztSichern() {
+  if (await autobackup.ladeOrdner()) {
+    const ergebnis = await autobackup.sichern({ mitNachfrage: true });
+    if (ergebnis === 'ok') {
+      state.backupFaellig = null;
+      toast('Backup im Ordner gespeichert.');
+      neuZeichnen();
+      return;
+    }
+    if (ergebnis === 'erlaubnis') {
+      toast('Ohne Erlaubnis kann die App nicht in den Ordner schreiben.', { dauer: 4000 });
+      return;
+    }
+  }
+  backupErstellen();
+}
 
 // Erster Start: noch keine Klasse vorhanden
 function zeichneWillkommen(container) {
@@ -218,6 +269,7 @@ async function start() {
   await neuZeichnen();
   await zurKlasseLautStundenplan();
   db.dauerhaftSpeichern(); // Browser bitten, die Daten nicht zu löschen
+  autoBackupPruefen();
 
   // Bei Drehen des Handys / Größenänderung: Raster neu berechnen (leicht verzögert)
   let timer;

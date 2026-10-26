@@ -14,6 +14,7 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
 - v10: Fächer im Stundenplan. Jede Stunde lässt sich als Informatik, GWB … markieren (Kürzel und Farbe), das Wochenraster zeigt die Stunden in der Fachfarbe. Dazu kleinere Design-Verbesserungen: eine Leiste „Mo–Fr | Woche“ statt zwei, Übersicht am Laptop mittig, kompakterer Kopf im Verlauf.
 - v11: Eigenes Layout für den Laptop (ab 1000 px Fensterbreite): Navigation links statt unten, Kopf des Sitzplans in einer Zeile, „Ohne Platz“ und die Bearbeiten-Aktionen rechts neben dem Raster. Der Sitzplan passt so ohne Scrollen auf den Bildschirm und die Plätze werden größer. Am Handy bleibt alles wie bisher.
   Mitarbeit hat jetzt drei Knöpfe: + / ✓ / − (✓ = passt, nichts Auffälliges; zählt nicht in die Summe, steht aber als eigene Spalte in Übersicht und CSV). Im Schnellmenü löscht „Diese Stunde löschen“ alle Einträge der Person seit Beginn der laufenden Stunde (mit „Rückgängig“).
+- v12: Automatisches Backup am Laptop: Die App speichert jede Woche (oder jeden Tag) von selbst ein Backup in einen Ordner, den man einmal auswählt (siehe „Datensicherung“).
 
 ## Projektstruktur
 
@@ -34,6 +35,7 @@ js/util/icons.js        Symbole als SVG (überall gleich, statt Emojis)
 js/util/beobachtung.js  Kategorien, Zeiträume (Heute … Schuljahr), Summen, Datumsformat
 js/util/datei.js        Datei speichern (Laptop: Download, iPhone: Teilen) und Datei wählen
 js/util/sicherung.js    Backup (JSON), Prüfen beim Import, CSV, Backup-Erinnerung
+js/util/autobackup.js   Automatisches Backup in einen Ordner am Laptop (Edge/Chrome)
 js/util/zeit.js         Uhrzeiten: welche Stunde läuft gerade, "noch … Min", mitlaufende Anzeige
 js/views/plan.js        Ansicht "Sitzplan"
 js/views/raum.js        Ansicht "Räume" (Liste aller Räume, Raster-Editor, Raum zuteilen)
@@ -145,6 +147,16 @@ Wer an mehreren Schulen unterrichtet, legt unter „Stundenplan“ für jede Sch
 
 ## Datensicherung und Übertragung
 
+**Wo liegen die Daten?** In einer Datenbank des Browsers (IndexedDB), nicht im Cache. „Cache leeren“
+löscht nur die App-Dateien, die Daten bleiben. Weg sind sie, wenn man im Browser die **Website-Daten**
+(„Cookies und andere Websitedaten“) dieser Seite löscht oder die App deinstalliert. Deshalb Backups machen –
+am Laptop am besten automatisch:
+
+- **Automatisches Backup (Laptop, Edge/Chrome):** „Mehr“ → „Automatisches Backup“ → „Ordner wählen und
+  einschalten“, z. B. einen neuen Ordner `Dokumente\Sitzplan-Backups`. Die App schreibt dann jede Woche
+  (einstellbar: jeden Tag) beim Öffnen eine Datei `sitzplan-backup-JJJJ-MM-TT-automatisch.json` hinein und behält
+  die letzten 10. Fragt der Browser nach dem Zugriff, „Bei jedem Besuch zulassen“ wählen. Sonst erscheint nach
+  einem Neustart oben ein Hinweis, und ein Klick auf „Jetzt sichern“ genügt.
 - **Backup erstellen:** „Mehr“ → „Backup erstellen“.
   - iPhone: Es öffnet sich das Teilen-Menü → „In Dateien sichern“ (iCloud Drive oder „Auf meinem iPhone“).
   - Laptop: Die Datei landet im Ordner „Downloads“.
@@ -170,7 +182,7 @@ auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v11';` erhöhen (v12, v13 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v12';` erhöhen (v13, v14 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.

@@ -18,16 +18,23 @@ const heuteText = () => {
 
 // ---------------------------------------------------------------- Backup
 
-// Alle Daten als eine JSON-Datei ausgeben. Fotos stecken als Text (Data-URL) mit drin.
-export async function backupExportieren() {
-  const daten = await db.alleDatenLesen();
-  const inhalt = JSON.stringify({
+// "sitzplan-backup-2026-10-26.json"
+export const backupDateiname = () => `sitzplan-backup-${heuteText()}.json`;
+
+// Der Inhalt einer Backup-Datei: alle Daten als JSON-Text. Fotos stecken als Text (Data-URL) mit drin.
+// (Auch für das automatische Backup in einen Ordner, siehe autobackup.js)
+export async function backupInhalt() {
+  return JSON.stringify({
     format: FORMAT,
     version: FORMAT_VERSION,
     erstellt: new Date().toISOString(),
-    daten,
+    daten: await db.alleDatenLesen(),
   });
-  const ok = await dateiAusgeben(`sitzplan-backup-${heuteText()}.json`, inhalt, 'application/json');
+}
+
+// Alle Daten als eine Datei ausgeben (Laptop: Download, iPhone: Teilen)
+export async function backupExportieren() {
+  const ok = await dateiAusgeben(backupDateiname(), await backupInhalt(), 'application/json');
   if (ok) await db.speichereEinstellung('letztesBackup', new Date().toISOString());
   return ok;
 }

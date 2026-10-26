@@ -5,7 +5,7 @@
 //
 // WICHTIG: Nach jeder Code-Änderung VERSION erhöhen (z. B. v2, v3 …).
 // Sonst lädt das Handy weiterhin die alte, gecachte Version.
-const VERSION = 'sitzplan-v11';
+const VERSION = 'sitzplan-v12';
 
 // Alle Dateien, die offline verfügbar sein müssen.
 // Neue Datei angelegt? -> hier eintragen!
@@ -27,6 +27,7 @@ const DATEIEN = [
   './js/util/datei.js',
   './js/util/sicherung.js',
   './js/util/zeit.js',
+  './js/util/autobackup.js',
   './js/views/plan.js',
   './js/views/raum.js',
   './js/views/schueler.js',

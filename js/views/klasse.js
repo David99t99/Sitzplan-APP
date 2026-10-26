@@ -9,6 +9,7 @@ import { icon } from '../util/icons.js';
 import { datumText } from '../util/beobachtung.js';
 import { backupExportieren, backupPruefen, backupErinnerung } from '../util/sicherung.js';
 import { dateiWaehlen } from '../util/datei.js';
+import * as autobackup from '../util/autobackup.js';
 import { pinKarte } from './sperre.js';
 
 // Die Ansicht "Mehr" in der unteren Navigation
@@ -88,6 +89,7 @@ export async function zeichneKlasse(container) {
     formular,
     el('h3', { class: 'abschnitt-titel', text: 'Für alle Klassen' }),
     await sicherungKarte(),
+    await autoBackupKarte(),
     await schnellbuttonsKarte(),
     await pinKarte(app.neuZeichnen),
     await speicherInfo(),
@@ -121,6 +123,78 @@ async function sicherungKarte() {
       el('button', { class: 'knopf', onclick: backupEinspielen }, icon('hinauf'), 'Backup einspielen'),
     ),
     feld('Erinnerung an ein Backup', intervall),
+  );
+}
+
+// Automatisches Backup in einen Ordner (nur Edge/Chrome am Computer, siehe util/autobackup.js)
+async function autoBackupKarte() {
+  const kopf = kartenKopf('sicherung', 'Automatisches Backup');
+  if (!autobackup.moeglich()) {
+    return el('div', { class: 'karte' }, kopf,
+      el('p', { class: 'hinweis', text: 'Automatische Backups in einen Ordner gehen nur am Computer mit Edge oder Chrome. Hier bitte von Hand sichern (oben „Backup erstellen“).' }));
+  }
+
+  const [ordner, letztes, tage] = await Promise.all([
+    autobackup.ladeOrdner(),
+    db.ladeEinstellung('letztesAutoBackup'),
+    db.ladeEinstellung('autoBackupTage', 7),
+  ]);
+
+  async function waehlen() {
+    if (!await autobackup.ordnerWaehlen()) return;
+    // Gleich das erste Backup schreiben (der Klick erlaubt die Nachfrage nach dem Zugriff)
+    const ergebnis = await autobackup.sichern({ mitNachfrage: true });
+    if (ergebnis === 'ok') state.backupFaellig = null;
+    toast(ergebnis === 'ok' ? 'Ordner gewählt, erstes Backup gespeichert.' : 'Ordner gewählt. Das Backup braucht noch deine Erlaubnis.', { dauer: 4000 });
+    app.neuZeichnen();
+  }
+
+  if (!ordner) {
+    return el('div', { class: 'karte' }, kopf,
+      el('p', { class: 'hinweis', text: 'Die App speichert regelmäßig von selbst ein Backup in einen Ordner auf diesem Computer – so sind die Daten auch dann sicher, wenn der Browser sie einmal verliert. Tipp: im Ordner „Dokumente“ einen neuen Ordner „Sitzplan-Backups“ anlegen und wählen.' }),
+      el('button', { class: 'knopf primaer', onclick: waehlen }, icon('sicherung'), 'Ordner wählen und einschalten'),
+    );
+  }
+
+  const intervall = el('select', {
+    onchange: async (e) => {
+      await db.speichereEinstellung('autoBackupTage', Number(e.target.value));
+      toast('Gespeichert.');
+    },
+  }, [[1, 'jeden Tag (beim ersten Öffnen)'], [7, 'jede Woche']].map(([w, t]) => el('option', { value: w, text: t })));
+  intervall.value = String(tage);
+
+  return el('div', { class: 'karte' }, kopf,
+    el('p', { class: 'status gut' }, icon('haken'), `Ein: Ordner „${ordner.name}“`),
+    el('p', { class: 'hinweis', text: (letztes ? `Zuletzt automatisch gesichert: ${datumText(letztes)}. ` : '')
+      + 'Die letzten 10 automatischen Backups bleiben im Ordner, ältere werden gelöscht. Fragt der Browser nach dem Zugriff, „Bei jedem Besuch zulassen“ wählen – dann läuft es ohne Nachfrage.' }),
+    feld('Automatisch sichern', intervall),
+    el('div', { class: 'leiste fuellen' },
+      el('button', {
+        class: 'knopf primaer',
+        onclick: async () => {
+          const ergebnis = await autobackup.sichern({ mitNachfrage: true });
+          if (ergebnis === 'ok') state.backupFaellig = null;
+          toast(ergebnis === 'ok' ? 'Backup im Ordner gespeichert.'
+            : ergebnis === 'erlaubnis' ? 'Ohne Erlaubnis kann die App nicht in den Ordner schreiben.'
+              : 'Das hat nicht geklappt. Gibt es den Ordner noch? Sonst einen anderen wählen.', { dauer: 4000 });
+          app.neuZeichnen();
+        },
+      }, icon('herunter'), 'Jetzt in den Ordner sichern'),
+      el('button', { class: 'knopf', text: 'Anderer Ordner', onclick: waehlen }),
+      el('button', {
+        class: 'knopf gefahr-leise', text: 'Ausschalten',
+        onclick: async () => {
+          if (!await bestaetigen({
+            titel: 'Automatisches Backup ausschalten?',
+            text: 'Die bisherigen Backups bleiben im Ordner.',
+            knopf: 'Ausschalten',
+          })) return;
+          await autobackup.ausschalten();
+          app.neuZeichnen();
+        },
+      }),
+    ),
   );
 }
 
