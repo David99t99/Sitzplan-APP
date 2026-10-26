@@ -11,6 +11,7 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
 - v7: Räume sind eigenständig (siehe „Räume“ unten) und ersetzen die Raumvorlagen. Die Klassen-Tabs oben lassen sich durch Ziehen umsortieren (am Handy: Tab gedrückt halten, dann ziehen).
 - v8: Abwesenheit. Im Schnellmenü „Abwesend“ antippen. Die Person erscheint an diesem Tag ausgegraut im Sitzplan („Wieder anwesend“ nimmt es zurück). Abwesenheiten stehen im Verlauf, werden in der Übersicht gezählt und sind in CSV und Backup enthalten.
 - v9: Schulen und Stundenplan (siehe unten). Jede Schule hat eine Farbe (Strich unter den Klassen-Tabs) und ihre Stundenzeiten; der Sitzplan zeigt die laufende Stunde mit „noch … Min“.
+- v10: Fächer im Stundenplan. Jede Stunde lässt sich als Informatik, GWB … markieren (Kürzel und Farbe), das Wochenraster zeigt die Stunden in der Fachfarbe. Dazu kleinere Design-Verbesserungen: eine Leiste „Mo–Fr | Woche“ statt zwei, Übersicht am Laptop mittig, kompakterer Kopf im Verlauf.
 
 ## Projektstruktur
 
@@ -124,8 +125,12 @@ Wer an mehreren Schulen unterrichtet, legt unter „Stundenplan“ für jede Sch
   Im Sitzplan steht dann oben z. B. „3. Stunde 09:50–10:40 · noch 12 Min“ mit einem Balken,
   in der Pause „Pause · 4. Stunde ab 10:45 · in 4 Min“. Dafür reicht schon die Schule – der Stundenplan
   muss nicht ausgefüllt sein.
-- **Stundenplan:** Unter „Woche“ ein Feld antippen und die Klasse wählen. „Tag“ zeigt die Stunden eines Tages
-  mit Uhrzeiten, Pausen und Freistunden; die laufende Stunde ist markiert. Antippen öffnet die Klasse.
+- **Stundenplan:** Unter „Woche“ ein Feld antippen, Klasse und Fach wählen, „Speichern“. Mo–Fr zeigt die Stunden
+  eines Tages mit Uhrzeiten, Pausen und Freistunden; die laufende Stunde ist markiert. Antippen öffnet die Klasse.
+- **Fächer:** Ein Fach (z. B. Informatik, GWB) hat ein Kürzel (INF) und eine Farbe. Damit sind die Stunden markiert:
+  im Wochenraster farbig mit Kürzel, in der Tagesansicht mit farbigem Etikett, im Sitzplan vor der Stunde.
+  Beim Eintragen schlägt die App das Fach vor, das die Klasse sonst hat. Fächer gelten für alle Schulen
+  und stehen unter „Stundenplan“ → „Fächer“.
 - Ist laut Stundenplan gerade eine andere Klasse dran, wechselt der Sitzplan beim Öffnen der App dorthin
   (auch nach mehr als 5 Minuten im Hintergrund). Ein Hinweis unten bietet „Zurück zu …“ an.
 - Schule löschen löscht nur ihre Stundenzeiten und ihren Stundenplan, nicht die Klassen.
@@ -157,7 +162,7 @@ auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v9';` erhöhen (v10, v11 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v10';` erhöhen (v11, v12 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.

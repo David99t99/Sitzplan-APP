@@ -830,7 +830,9 @@ select {
 .wachsen { flex: 1; min-width: 0; margin: 0; }
 
 /* Am Laptop: Tabellen dürfen breiter werden */
-.ansicht.breit { max-width: 1400px; }
+/* So breit wie die Tabelle (höchstens 1400 px), aber nie schmaler als die anderen
+   Seiten – so beginnt die Übersicht an derselben Kante wie alles andere */
+.ansicht.breit { max-width: 1400px; width: fit-content; min-width: min(900px, 100%); }
 
 /* ------------------------------------------------------------ Zähler am Platz
    Links oben die Minus-, rechts oben die Plus-Einträge von heute: so sieht man
@@ -942,9 +944,9 @@ select {
 .feld.kompakt { flex: 1 1 140px; max-width: 260px; }
 
 /* ------------------------------------------------------------ Verlauf einer Person */
-.person-kopf { display: flex; align-items: center; gap: 14px; }
-.person-kopf .avatar { width: 64px; }
-.person-kopf h2 { margin: 0; }
+.person-kopf { display: flex; align-items: center; gap: 12px; }
+.person-kopf .avatar { width: 52px; }
+.person-kopf h2 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .kacheln { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
 .kachel {
@@ -1166,8 +1168,8 @@ body.gesperrt #kopf, body.gesperrt #inhalt, body.gesperrt #navi { visibility: hi
 .schul-titel span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .liste .zeile .farbpunkt.gross { margin: 0 6px; }
 
-/* Wochentage Mo–Fr: heute mit Punkt darunter */
-.umschalter.tage .umschalter-knopf { position: relative; }
+/* Leiste Mo–Fr | Woche: heute mit Punkt darunter, "Woche" etwas abgesetzt */
+.umschalter.tage .umschalter-knopf { position: relative; min-width: 0; padding: 0 2px; }
 .umschalter.tage .umschalter-knopf.heute::after {
   content: "";
   position: absolute;
@@ -1177,10 +1179,40 @@ body.gesperrt #kopf, body.gesperrt #inhalt, body.gesperrt #navi { visibility: hi
   border-radius: 50%;
   background: var(--akzent);
 }
+.umschalter.tage .woche-knopf { flex: 1.35; margin-left: 6px; }
+.umschalter.tage .woche-knopf::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--rand-stark);
+}
+
+/* Fach: farbiges Etikett ("Informatik") bzw. Kürzel ("INF"). Farbe kommt als --fachfarbe. */
+.fach-etikett {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fachfarbe) 16%, var(--flaeche));
+  color: color-mix(in srgb, var(--fachfarbe) 72%, var(--text));
+  border: 1px solid color-mix(in srgb, var(--fachfarbe) 40%, transparent);
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.fach-etikett.kurz { padding: 0 6px; font-size: .7rem; letter-spacing: .03em; }
+/* In der Liste der Fächer: großes Kürzel als "Symbol" vorne */
+.fach-etikett.gross { width: 48px; min-height: 32px; padding: 0 4px; border-radius: 10px; font-size: .8rem; letter-spacing: .03em; }
 
 /* ------------------------------------------------------------ Tag: Stunden mit Uhrzeit */
 .liste.stunden .std { position: relative; }
-.std .zeile { min-height: 60px; }
+.std .zeile { min-height: 62px; }
 .std-zeit {
   width: 3.1em;
   flex: none;
@@ -1191,10 +1223,13 @@ body.gesperrt #kopf, body.gesperrt #inhalt, body.gesperrt #navi { visibility: hi
   font-variant-numeric: tabular-nums;
 }
 .std-zeit small { color: var(--leise); }
-.std-strich { align-self: stretch; width: 4px; flex: none; margin: 2px 0; border-radius: 2px; background: var(--schulfarbe); }
-.std.frei .std-strich { background: color-mix(in srgb, var(--schulfarbe) 30%, transparent); }
+/* Strich in der Farbe des Fachs (ohne Fach: der Schule) */
+.std-strich { align-self: stretch; width: 4px; flex: none; margin: 2px 0; border-radius: 2px; background: var(--stdfarbe); }
+.std.frei .std-strich { background: var(--rand); }
 .std.frei .zeile-text strong { color: var(--leise); font-weight: 500; }
-.std.vorbei .zeile { opacity: .5; }
+.std-titel { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.std-titel strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.std.vorbei .zeile { opacity: .55; }
 .std-status:empty { display: none; }
 .std-status {
   flex: none;
@@ -1248,31 +1283,51 @@ body.gesperrt #kopf, body.gesperrt #inhalt, body.gesperrt #navi { visibility: hi
 .woche-zeit strong { font-size: .85rem; color: var(--text); }
 .woche-feld {
   min-width: 0;
-  min-height: 52px;
+  min-height: 54px;
   padding: 2px 4px;
   border: 1px dashed var(--rand-stark);
   border-radius: 10px;
   background: transparent;
-  font-size: .85rem;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.15;
 }
+.woche-feld > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.woche-feld strong { font-size: .88rem; }
+/* Kürzel des Fachs unter der Klasse, in der Fachfarbe */
+.woche-feld small {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: color-mix(in srgb, var(--stdfarbe) 72%, var(--text));
+}
+/* Heute: Spalte leicht hinterlegt */
+.woche-feld.heute { background: color-mix(in srgb, var(--akzent) 5%, transparent); }
 .woche-feld.belegt {
   border: 0;
-  border-left: 4px solid var(--schulfarbe);
-  background: color-mix(in srgb, var(--schulfarbe) 18%, var(--flaeche));
+  border-left: 4px solid var(--stdfarbe);
+  background: color-mix(in srgb, var(--stdfarbe) 17%, var(--flaeche));
   box-shadow: var(--schatten);
 }
 .woche-feld.jetzt { outline: 3px solid var(--akzent); outline-offset: 1px; }
 .schul-chip { min-height: 44px; padding-left: 14px; }
 .schul-chip.aktiv { border: 2px solid var(--akzent); background: var(--akzent-hell); }
 
-/* Dialog: Klasse für eine Stunde wählen */
+/* Dialog: Klasse und Fach für eine Stunde wählen */
 .klassen-wahl { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 .klassen-wahl .knopf { padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Fächer: so breit wie ihr Name, mehrere pro Zeile */
+.fach-leiste { display: flex; flex-wrap: wrap; gap: 8px; }
+.fach-leiste .knopf { flex: 1 1 auto; padding: 0 12px; gap: 6px; }
+.knopf.fach-wahl.gewaehlt {
+  border: 2px solid var(--fachfarbe, var(--akzent));
+  background: color-mix(in srgb, var(--fachfarbe, var(--akzent)) 14%, var(--flaeche));
+}
 .dialog-inhalt h3 { margin: 4px 0 -4px; }
+.fach-felder { grid-template-columns: minmax(0, 1fr) 6.5em; }
 
 /* ------------------------------------------------------------ Schule: Stundenzeiten */
 .zeiten { display: flex; flex-direction: column; gap: 6px; }

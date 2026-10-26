@@ -15,7 +15,7 @@ import { pinKarte } from './sperre.js';
 export async function zeichneKlasse(container) {
   const klasse = aktuelleKlasse();
   const raum = await db.ladeRaum(klasse.raumId);
-  const f = klassenFelder(klasse);
+  const f = klassenFelder(klasse, await db.ladeFaecher());
 
   const formular = el('form', {
     class: 'karte',
@@ -207,7 +207,7 @@ async function schnellbuttonsKarte() {
 export async function neueKlasseDialog() {
   // Schule vorschlagen: die der gerade geöffneten Klasse, oder die einzige
   const schuleId = aktuelleKlasse()?.schuleId ?? (state.schulen.length === 1 ? state.schulen[0].id : null);
-  const f = klassenFelder({ schuljahr: aktuellesSchuljahr(), schuleId });
+  const f = klassenFelder({ schuljahr: aktuellesSchuljahr(), schuleId }, await db.ladeFaecher());
   const raeume = await db.ladeRaeume();
 
   const neuerName = el('input', { maxlength: 40, placeholder: 'z. B. Raum 12 oder EDV Nord' });
@@ -249,9 +249,11 @@ export async function neueKlasseDialog() {
 
 // Die Eingabefelder einer Klasse (für Dialog und Ansicht).
 // Die Auswahl "Schule" gibt es erst, wenn mindestens eine Schule angelegt ist.
-function klassenFelder(k) {
+// Beim Fach schlägt das Feld die Fächer aus dem Stundenplan vor (frei tippen geht trotzdem).
+function klassenFelder(k, faecher = []) {
   const name = el('input', { required: true, maxlength: 30, value: k.name || '', placeholder: 'z. B. 1a GWB' });
-  const fach = el('input', { value: k.fach || '', placeholder: 'z. B. Informatik' });
+  const vorschlaege = el('datalist', { id: 'fach-vorschlaege' }, faecher.map((f) => el('option', { value: f.name })));
+  const fach = el('input', { value: k.fach || '', placeholder: 'z. B. Informatik', list: 'fach-vorschlaege', autocomplete: 'off' });
   const schuljahr = el('input', { value: k.schuljahr || '', placeholder: 'z. B. 2026/27' });
   const schule = state.schulen.length ? el('select', {},
     el('option', { value: '', text: '– keine Schule –' }),
@@ -265,6 +267,7 @@ function klassenFelder(k) {
         feld('Fach (optional)', fach),
         feld('Schuljahr (optional)', schuljahr),
       ),
+      vorschlaege,
       schule ? feld('Schule', schule) : null,
     ],
     werte: () => ({

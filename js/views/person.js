@@ -25,17 +25,17 @@ export async function zeichnePerson(container) {
   const gefiltert = imZeitraumListe.filter((b) => f.kategorie === 'alle' || b.kategorie === f.kategorie);
   const s = summen(imZeitraumListe);
 
-  // ---------- Kopf ----------
+  // ---------- Kopf: Zurück, Foto, Name in einer Zeile ----------
   container.append(
-    el('div', { class: 'leiste' },
-      el('button', {
-        class: 'knopf klein',
-        onclick: () => { state.ansicht = state.zurueck; app.neuZeichnen(); },
-      }, icon('links'), 'Zurück'),
-    ),
     el('div', { class: 'person-kopf' },
+      el('button', {
+        class: 'knopf rund',
+        'aria-label': 'Zurück',
+        title: 'Zurück',
+        onclick: () => { state.ansicht = state.zurueck; app.neuZeichnen(); },
+      }, icon('links')),
       avatar(person),
-      el('div', {},
+      el('div', { class: 'wachsen' },
         el('h2', { text: vollerName(person) }),
         person.notiz ? el('p', { class: 'hinweis', text: person.notiz }) : null,
       ),
@@ -70,7 +70,7 @@ export async function zeichnePerson(container) {
 
   // ---------- Liste, nach Tagen gruppiert ----------
   container.append(el('div', { class: 'leiste' },
-    el('h3', { class: 'wachsen', text: `${gefiltert.length} Einträge` }),
+    el('h3', { class: 'wachsen', text: gefiltert.length === 1 ? '1 Eintrag' : `${gefiltert.length} Einträge` }),
     el('button', {
       class: 'knopf klein',
       onclick: async () => {

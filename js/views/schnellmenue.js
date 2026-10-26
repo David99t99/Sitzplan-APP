@@ -109,9 +109,8 @@ export async function oeffneSchnellmenue(person, heute = []) {
     ) : null,
     el('button', {
       class: 'knopf' + (abwesenheiten.length ? ' aktiv' : ''),
-      text: abwesenheiten.length ? 'Wieder anwesend' : 'Abwesend',
       onclick: abwesenheitUmschalten,
-    }),
+    }, icon(abwesenheiten.length ? 'anwesend' : 'abwesend'), abwesenheiten.length ? 'Wieder anwesend' : 'Abwesend'),
     el('div', { class: 'notiz-zeile' },
       notiz,
       el('button', { class: 'knopf', text: 'Notieren', onclick: notizSpeichern }),

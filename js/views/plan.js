@@ -26,7 +26,7 @@ import { ziehbarMachen, warGeradeGezogen } from '../util/ziehen.js';
 import { zeitraumGrenzen, istAbwesend, ABWESEND } from '../util/beobachtung.js';
 import { oeffneSchnellmenue } from './schnellmenue.js';
 import { versionSpeichernDialog } from './versionen.js';
-import { stundeInfo } from './stundenplan.js';
+import { stundeInfo, faecherHeute } from './stundenplan.js';
 
 const LUECKE = 5;    // Abstand zwischen den Feldern in px (muss zu --luecke in app.css passen)
 const GANG = 0.35;   // Gang (Spalte/Zeile ohne Plätze): so viel von einem normalen Feld
@@ -35,13 +35,16 @@ const FLACH = 0.6;   // Spalte/Zeile, in der nur Tafel oder Tür liegen
 export async function zeichnePlan(container) {
   const klasse = aktuelleKlasse();
   // plan = wer sitzt wo (gehört der Klasse), raum = wo die Plätze sind (gilt für alle Klassen im Raum)
-  // schule = Stundenzeiten für "3. Stunde · noch 12 Min" (oder null)
-  const [plan, raum, personen, heuteAlle, schule] = await Promise.all([
+  // schule = Stundenzeiten für "3. Stunde · noch 12 Min" (oder null),
+  // stundenplan + faecher = welches Fach diese Klasse heute in welcher Stunde hat
+  const [plan, raum, personen, heuteAlle, schule, stundenplan, faecher] = await Promise.all([
     db.ladeAktuellenPlan(klasse.id),
     db.ladeRaum(klasse.raumId),
     db.ladePersonen(klasse.id),
     db.ladeBeobachtungenKlasse(klasse.id, zeitraumGrenzen('heute').ab),
     db.ladeSchule(klasse.schuleId),
+    db.ladeStundenplan(),
+    db.ladeFaecher(),
   ]);
   // Heutige Einträge nach Person sortiert: Map personId -> [Einträge]
   const heute = new Map();
@@ -99,7 +102,7 @@ export async function zeichnePlan(container) {
       modusKnopf('bearbeiten', 'stift', 'Bearbeiten'),
     ),
     el('div', { class: 'plan-info' },
-      el('p', { class: 'unterzeile wachsen' + (gewaehlt ? ' akzent' : '') }, bearbeiten ? info : stundeInfo(schule, ort, abwesend)),
+      el('p', { class: 'unterzeile wachsen' + (gewaehlt ? ' akzent' : '') }, bearbeiten ? info : stundeInfo(schule, ort, abwesend, faecherHeute(klasse, stundenplan, faecher))),
       sichtKnopf(),
     ),
   ));

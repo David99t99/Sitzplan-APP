@@ -25,7 +25,9 @@ export const db = new Dexie('sitzplan');
 // Beobachtung { id, personId, klasseId, zeitpunkt, kategorie, wert, text }   (ab Phase 2)
 // Einstellung { schluessel, wert }
 // Schule      { id, name, farbe ("#eab308"), stunden: [{ von: "07:50", bis: "08:40" }, …] }   (ab v9)
-// Stunde      { id, schuleId, tag (1 = Mo … 5 = Fr), stunde (1 = erste Stunde), klasseId }  (ab v9)
+// Stunde      { id, schuleId, tag (1 = Mo … 5 = Fr), stunde (1 = erste Stunde), klasseId,
+//               fachId (ab v10, oder null) }                                               (ab v9)
+// Fächer stehen als Liste in den Einstellungen ("faecher"): { id, name, kurz, farbe }      (ab v10)
 //
 // Hinweis: "aktuell" ist 1/0 statt true/false, weil IndexedDB nach
 // Wahrheitswerten nicht suchen kann.
@@ -246,14 +248,34 @@ export async function ladeStundenplan() {
   return db.stundenplan.toArray();
 }
 
-// Trägt eine Klasse in eine Stunde ein (klasseId = null: Stunde leeren).
+// Trägt eine Klasse (mit Fach) in eine Stunde ein (klasseId = null: Stunde leeren).
 // Pro Schule, Tag und Stunde gibt es höchstens einen Eintrag.
-export async function setzeStunde({ schuleId, tag, stunde, klasseId }) {
+export async function setzeStunde({ schuleId, tag, stunde, klasseId, fachId = null }) {
   await db.transaction('rw', db.stundenplan, async () => {
     await db.stundenplan.where('schuleId').equals(schuleId)
       .filter((e) => e.tag === tag && e.stunde === stunde).delete();
-    if (klasseId) await db.stundenplan.add({ id: neueId(), schuleId, tag, stunde, klasseId });
+    if (klasseId) await db.stundenplan.add({ id: neueId(), schuleId, tag, stunde, klasseId, fachId });
   });
+}
+
+// Fächer (Informatik, GWB …) markieren die Stunden im Stundenplan: Kürzel und Farbe.
+// Sie gelten für alle Schulen und stehen als Liste in den Einstellungen.
+export async function ladeFaecher() {
+  const liste = await ladeEinstellung('faecher', []);
+  return liste.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+
+export async function speichereFach(fach) {
+  const liste = (await ladeFaecher()).filter((f) => f.id !== fach.id);
+  if (!fach.id) fach.id = neueId();
+  await speichereEinstellung('faecher', [...liste, fach]);
+  return fach;
+}
+
+// Löscht ein Fach. Die Stunden bleiben im Stundenplan, nur ohne Fach.
+export async function loescheFach(id) {
+  await speichereEinstellung('faecher', (await ladeFaecher()).filter((f) => f.id !== id));
+  await db.stundenplan.filter((e) => e.fachId === id).modify({ fachId: null });
 }
 
 // Entfernt alle Einträge einer Schule ab dieser Stunde (wenn Stunden wegfallen)
@@ -459,7 +481,7 @@ export async function sortiereKlassen(ids) {
 
 // Diese Einstellungen gehören zu den Daten und wandern mit ins Backup.
 // Gerätebezogenes (PIN, letztes Backup, Ansicht) bleibt auf dem Gerät.
-const EINSTELLUNGEN_IM_BACKUP = ['schnellbuttons'];
+const EINSTELLUNGEN_IM_BACKUP = ['schnellbuttons', 'faecher'];
 
 export async function alleDatenLesen() {
   const einstellungen = (await db.einstellungen.toArray())

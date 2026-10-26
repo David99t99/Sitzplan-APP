@@ -1,11 +1,13 @@
-// stundenplan.js – die Ansicht "Stundenplan" und die Schulen.
+// stundenplan.js – die Ansicht "Stundenplan", die Schulen und die Fächer.
 //
 // Eine Schule hat eine Farbe und ihre Stundenzeiten (1. Stunde 07:50–08:40 …).
 // Die Farbe erscheint als Strich unter den Klassen-Tabs, die Stundenzeiten im
 // Sitzplan ("3. Stunde 09:50–10:40 · noch 12 Min").
+// Ein Fach (Informatik, GWB …) hat ein Kürzel und eine Farbe: Damit sind die Stunden
+// im Stundenplan markiert, man sieht auf einen Blick, was dran ist.
 //
-//   Tag     – die Stunden eines Wochentags mit Uhrzeit, Pausen und "noch … Min"
-//   Woche   – der Stundenplan einer Schule als Raster: Feld antippen = Klasse eintragen
+//   Mo–Fr   – die Stunden eines Tages mit Uhrzeit, Fach, Pausen und "noch … Min"
+//   Woche   – der Stundenplan einer Schule als Raster: Feld antippen = Klasse und Fach eintragen
 //   Schule  – Stundenzeiten, Name, Farbe und Klassen einer Schule (state.schuleId)
 
 import { state, app, aktuelleKlasse } from '../state.js';
@@ -14,8 +16,8 @@ import { el, toast, zeigeDialog, bestaetigen, feld, kartenKopf } from '../util/u
 import { icon } from '../util/icons.js';
 import { TAGE, minuten, uhrzeit, dauerText, wochentag, sekunden, stundeJetzt, mitlaufend } from '../util/zeit.js';
 
-// Farben zur Auswahl. "hell": der Haken darauf ist dunkel statt weiß (besser lesbar)
-const SCHULFARBEN = [
+// Farben zur Auswahl (Schulen und Fächer). "hell": der Haken darauf ist dunkel statt weiß
+const FARBEN = [
   { name: 'Gelb', wert: '#eab308', hell: true },
   { name: 'Orange', wert: '#f97316' },
   { name: 'Rot', wert: '#dc2626' },
@@ -28,11 +30,14 @@ const SCHULFARBEN = [
   { name: 'Grau', wert: '#64748b' },
 ];
 
+// Vorschlag für etwas Neues: die erste Farbe, die noch niemand hat
+const freieFarbe = (vergeben) => (FARBEN.find((f) => !vergeben.includes(f.wert)) || FARBEN[0]).wert;
+
 // So viel Pause kommt vor eine neu hinzugefügte Stunde
 const NEUE_PAUSE = 5;
 
 export async function zeichneStundenplan(container) {
-  const [schulen, eintraege] = await Promise.all([db.ladeSchulen(), db.ladeStundenplan()]);
+  const [schulen, eintraege, faecher] = await Promise.all([db.ladeSchulen(), db.ladeStundenplan(), db.ladeFaecher()]);
   const schule = schulen.find((s) => s.id === state.schuleId);
   if (schule) return zeichneSchule(container, schule, eintraege);
   state.schuleId = null;
@@ -48,14 +53,36 @@ export async function zeichneStundenplan(container) {
     return;
   }
 
-  container.append(el('div', { class: 'umschalter', role: 'group', 'aria-label': 'Ansicht' },
-    ansichtKnopf('tag', 'Tag'),
-    ansichtKnopf('woche', 'Woche'),
-  ));
-  if (state.stundenplanAnsicht === 'woche') zeichneWoche(container, schulen, eintraege);
-  else zeichneTag(container, schulen, eintraege);
+  // Alles, was Tag und Woche brauchen
+  const daten = {
+    schulen, eintraege, faecher,
+    klasseNachId: new Map(state.klassen.map((k) => [k.id, k])),
+    fachNachId: new Map(faecher.map((f) => [f.id, f])),
+  };
+  container.append(tagWahl());
+  if (state.stundenplanAnsicht === 'woche') zeichneWoche(container, daten);
+  else zeichneTag(container, daten);
 
-  // ---------- Alle Schulen ----------
+  // ---------- Fächer ----------
+  const stundenMit = (fach) => eintraege.filter((e) => e.fachId === fach.id).length;
+  container.append(
+    el('h3', { class: 'abschnitt-titel', text: 'Fächer' }),
+    faecher.length
+      ? el('ul', { class: 'liste' }, faecher.map((f) => el('li', {},
+        el('button', { class: 'zeile', onclick: async () => { if (await fachDialog(f)) app.neuZeichnen(); } },
+          fachEtikett(f, 'gross'),
+          el('span', { class: 'zeile-text' },
+            el('strong', { text: f.name }),
+            el('small', { text: stundenMit(f) === 1 ? '1 Stunde pro Woche' : `${stundenMit(f)} Stunden pro Woche` }),
+          ),
+          el('span', { class: 'pfeil' }, icon('rechts')),
+        ))))
+      : el('p', { class: 'hinweis', text: 'Mit Fächern (z. B. Informatik, GWB) sind die Stunden farbig markiert – du siehst auf einen Blick, was dran ist.' }),
+    el('div', { class: 'leiste fuellen' },
+      el('button', { class: 'knopf', onclick: async () => { if (await fachDialog(null)) app.neuZeichnen(); } }, icon('plus'), 'Neues Fach')),
+  );
+
+  // ---------- Schulen ----------
   container.append(
     el('h3', { class: 'abschnitt-titel', text: 'Schulen' }),
     el('ul', { class: 'liste' }, schulen.map((s) => {
@@ -77,33 +104,44 @@ export async function zeichneStundenplan(container) {
   );
 }
 
-function ansichtKnopf(id, text) {
-  const aktiv = state.stundenplanAnsicht === id;
-  return el('button', {
-    class: 'umschalter-knopf' + (aktiv ? ' aktiv' : ''),
+const gewaehlterTag = () => state.stundenplanTag ?? (wochentag() <= 5 ? wochentag() : 1);
+
+// Eine Leiste für beides: Mo–Fr zeigt diesen Tag, "Woche" das Raster. Heute hat einen Punkt.
+function tagWahl() {
+  const heute = wochentag();
+  const woche = state.stundenplanAnsicht === 'woche';
+  const knopf = (aktiv, text, onclick, extra = {}) => el('button', {
+    ...extra,
+    class: 'umschalter-knopf' + (aktiv ? ' aktiv' : '') + (extra.class ? ' ' + extra.class : ''),
     'aria-pressed': String(aktiv),
-    onclick: () => { state.stundenplanAnsicht = id; app.neuZeichnen(); },
+    onclick: () => { onclick(); app.neuZeichnen(); },
   }, text);
+  return el('div', { class: 'umschalter tage', role: 'group', 'aria-label': 'Tag oder Woche' },
+    TAGE.map((t) => knopf(!woche && t.nr === gewaehlterTag(), t.kurz,
+      () => { state.stundenplanAnsicht = 'tag'; state.stundenplanTag = t.nr; },
+      { class: t.nr === heute ? 'heute' : '', 'aria-label': t.name + (t.nr === heute ? ' (heute)' : '') })),
+    knopf(woche, 'Woche', () => { state.stundenplanAnsicht = 'woche'; }, { class: 'woche-knopf' }),
+  );
 }
 
 const farbPunkt = (farbe, gross = false) =>
   el('span', { class: 'farbpunkt' + (gross ? ' gross' : ''), style: { background: farbe } });
 
+// Farbiges Etikett eines Fachs: ganzer Name, oder nur das Kürzel ('kurz', 'gross')
+function fachEtikett(fach, art = '') {
+  return el('span', {
+    class: 'fach-etikett' + (art ? ' ' + art : ''),
+    style: { '--fachfarbe': fach.farbe },
+    title: fach.name,
+    text: art ? fach.kurz : fach.name,
+  });
+}
+
 // ============================ Tag ==========================================
 
-function zeichneTag(container, schulen, eintraege) {
+function zeichneTag(container, { schulen, eintraege, klasseNachId, fachNachId }) {
   const heute = wochentag();
-  const tag = state.stundenplanTag ?? (heute <= 5 ? heute : 1);
-  const klasseNachId = new Map(state.klassen.map((k) => [k.id, k]));
-
-  container.append(el('div', { class: 'umschalter tage', role: 'group', 'aria-label': 'Wochentag' },
-    TAGE.map((t) => el('button', {
-      class: 'umschalter-knopf' + (t.nr === tag ? ' aktiv' : '') + (t.nr === heute ? ' heute' : ''),
-      'aria-pressed': String(t.nr === tag),
-      'aria-label': t.name + (t.nr === heute ? ' (heute)' : ''),
-      onclick: () => { state.stundenplanTag = t.nr; app.neuZeichnen(); },
-    }, t.kurz)),
-  ));
+  const tag = gewaehlterTag();
 
   // Je Schule, in der an diesem Tag etwas eingetragen ist: die Stunden von der ersten
   // bis zur letzten eingetragenen (dazwischen Freistunden). Ist an diesem Tag gar
@@ -115,15 +153,18 @@ function zeichneTag(container, schulen, eintraege) {
     if (!eigene.length) continue;
     const nummern = eigene.map((e) => e.stunde);
     for (let nr = Math.min(...nummern); nr <= Math.max(...nummern); nr++) {
-      const klasseId = eigene.find((e) => e.stunde === nr)?.klasseId;
-      zeilen.push({ schule, nr, zeit: schule.stunden[nr - 1], klasse: klasseNachId.get(klasseId) });
+      const eintrag = eigene.find((e) => e.stunde === nr);
+      zeilen.push({
+        schule, nr, zeit: schule.stunden[nr - 1],
+        klasse: klasseNachId.get(eintrag?.klasseId), fach: fachNachId.get(eintrag?.fachId),
+      });
     }
   }
   const nichtsEingetragen = zeilen.length === 0;
   const schuleDesTages = zeilen[0]?.schule
     || schulen.find((s) => s.id === aktuelleKlasse()?.schuleId) || schulen[0];
   if (nichtsEingetragen) {
-    zeilen = schuleDesTages.stunden.map((zeit, i) => ({ schule: schuleDesTages, nr: i + 1, zeit, klasse: null }));
+    zeilen = schuleDesTages.stunden.map((zeit, i) => ({ schule: schuleDesTages, nr: i + 1, zeit }));
     container.append(el('p', { class: 'hinweis', text:
       `Am ${TAGE[tag - 1].name} ist noch keine Klasse eingetragen. Tippe eine Stunde an, um eine einzutragen.`
       + (schulen.length > 1 ? ` Hier die Stundenzeiten von „${schuleDesTages.name}“.` : '') }));
@@ -152,9 +193,15 @@ function zeichneTag(container, schulen, eintraege) {
   container.append(liste);
 }
 
-// Eine Stunde im Tagesplan. Antippen öffnet die Klasse – oder trägt in einer freien Stunde eine ein.
-function stundenZeile({ schule, nr, zeit, klasse }, tag, heute, mitSchule) {
-  const li = el('li', { class: 'std' + (klasse ? '' : ' frei'), style: { '--schulfarbe': schule.farbe } });
+// Eine Stunde im Tagesplan. Der Strich links hat die Farbe des Fachs (ohne Fach: der Schule).
+// Antippen öffnet die Klasse – oder trägt in einer freien Stunde eine ein.
+function stundenZeile({ schule, nr, zeit, klasse, fach }, tag, heute, mitSchule) {
+  const li = el('li', {
+    class: 'std' + (klasse ? '' : ' frei'),
+    style: { '--stdfarbe': fach?.farbe || schule.farbe },
+  });
+  // Ohne Fach im Stundenplan steht das Fach aus "Angaben zur Klasse" klein darunter
+  const unten = [`${nr}. Stunde`, fach ? null : klasse?.fach, mitSchule ? schule.name : null];
   li.append(el('button', {
     class: 'zeile',
     onclick: klasse
@@ -164,8 +211,10 @@ function stundenZeile({ schule, nr, zeit, klasse }, tag, heute, mitSchule) {
     el('span', { class: 'std-zeit' }, el('strong', { text: zeit.von }), el('small', { text: zeit.bis })),
     el('span', { class: 'std-strich' }),
     el('span', { class: 'zeile-text' },
-      el('strong', { text: klasse ? klasse.name : 'frei' }),
-      el('small', { text: [`${nr}. Stunde`, klasse?.fach, mitSchule ? schule.name : null].filter(Boolean).join(' · ') }),
+      el('span', { class: 'std-titel' },
+        el('strong', { text: klasse ? klasse.name : 'frei' }),
+        fach ? fachEtikett(fach) : null),
+      el('small', { text: unten.filter(Boolean).join(' · ') }),
     ),
     heute ? mitlaufend(el('span', { class: 'std-status' }), (e) => stundeStatus(e, li, zeit)) : null,
     el('span', { class: 'pfeil' }, icon(klasse ? 'rechts' : 'plus')),
@@ -187,10 +236,9 @@ function stundeStatus(e, li, zeit) {
 
 // ============================ Woche ========================================
 
-function zeichneWoche(container, schulen, eintraege) {
+function zeichneWoche(container, { schulen, eintraege, klasseNachId, fachNachId }) {
   const schule = schulen.find((s) => s.id === state.stundenplanSchule)
     || schulen.find((s) => s.id === aktuelleKlasse()?.schuleId) || schulen[0];
-  const klasseNachId = new Map(state.klassen.map((k) => [k.id, k]));
 
   if (schulen.length > 1) {
     container.append(el('div', { class: 'chips', role: 'group', 'aria-label': 'Schule' }, schulen.map((s) => el('button', {
@@ -208,9 +256,10 @@ function zeichneWoche(container, schulen, eintraege) {
     return;
   }
 
+  // Jede Stunde in der Farbe ihres Fachs, mit Kürzel unter der Klasse. Heute ist leicht hinterlegt.
   const heute = wochentag();
   const lage = stundeJetzt(schule.stunden);
-  const raster = el('div', { class: 'woche', style: { '--schulfarbe': schule.farbe } },
+  const raster = el('div', { class: 'woche' },
     el('div', {}),
     TAGE.map((t) => el('div', { class: 'woche-tag' + (t.nr === heute ? ' heute' : ''), text: t.kurz })),
   );
@@ -221,60 +270,189 @@ function zeichneWoche(container, schulen, eintraege) {
     for (const t of TAGE) {
       const eintrag = eintraege.find((e) => e.schuleId === schule.id && e.tag === t.nr && e.stunde === nr);
       const klasse = klasseNachId.get(eintrag?.klasseId);
+      const fach = klasse ? fachNachId.get(eintrag.fachId) : null;
       const jetzt = t.nr === heute && lage?.art === 'stunde' && lage.nr === nr;
       raster.append(el('button', {
-        class: 'woche-feld' + (klasse ? ' belegt' : '') + (jetzt ? ' jetzt' : ''),
-        'aria-label': `${t.name}, ${nr}. Stunde: ${klasse ? klasse.name : 'frei'}`,
-        title: klasse?.fach || null,
+        class: 'woche-feld' + (klasse ? ' belegt' : '') + (t.nr === heute ? ' heute' : '') + (jetzt ? ' jetzt' : ''),
+        style: klasse ? { '--stdfarbe': fach?.farbe || schule.farbe } : null,
+        'aria-label': `${t.name}, ${nr}. Stunde: ${klasse ? klasse.name + (fach ? ' ' + fach.name : '') : 'frei'}`,
+        title: fach?.name || klasse?.fach || null,
         onclick: () => stundeWaehlen(schule, t.nr, nr),
-      }, klasse ? klasse.name : ''));
+      }, klasse ? el('strong', { text: klasse.name }) : null, fach ? el('small', { text: fach.kurz }) : null));
     }
   });
   container.append(
     el('div', { class: 'woche-huelle' }, raster),
-    el('p', { class: 'unterzeile', text: 'Feld antippen, um eine Klasse einzutragen oder zu ändern.' }),
+    el('p', { class: 'unterzeile', text: 'Feld antippen, um Klasse und Fach einzutragen oder zu ändern.' }),
   );
 }
 
-// Dialog: Welche Klasse ist in dieser Stunde? Zur Wahl stehen die Klassen der Schule
-// und die Klassen ohne Schule (die gehören danach zu dieser Schule).
+// Dialog: Welche Klasse ist in dieser Stunde, und welches Fach? Zur Wahl stehen die Klassen
+// der Schule und die Klassen ohne Schule (die gehören danach zu dieser Schule).
+// Beim Antippen einer Klasse wird ihr übliches Fach vorgeschlagen.
 async function stundeWaehlen(schule, tag, nr) {
-  const eintrag = (await db.ladeStundenplan())
-    .find((e) => e.schuleId === schule.id && e.tag === tag && e.stunde === nr);
+  const [alle, faecher] = await Promise.all([db.ladeStundenplan(), db.ladeFaecher()]);
+  const eintrag = alle.find((e) => e.schuleId === schule.id && e.tag === tag && e.stunde === nr);
   const zeit = schule.stunden[nr - 1];
   const eigene = state.klassen.filter((k) => k.schuleId === schule.id);
   const ohne = state.klassen.filter((k) => !k.schuleId);
-  // Jede Klasse ist ein Absende-Knopf: zeigeDialog() liefert dann ihre id
-  const wahl = (liste) => el('div', { class: 'klassen-wahl' }, liste.map((k) => el('button', {
-    type: 'submit', value: k.id,
-    class: 'knopf' + (eintrag?.klasseId === k.id ? ' primaer' : ''),
-    'aria-pressed': String(eintrag?.klasseId === k.id),
-  }, k.name)));
+  let klasseId = eintrag?.klasseId ?? null;
+  let fachId = eintrag?.fachId ?? null;
+
+  // Gewählte Klasse und gewähltes Fach hervorheben (ohne den Dialog neu aufzubauen)
+  const klassenKnoepfe = [];
+  const fachLeiste = el('div', { class: 'fach-leiste', role: 'group', 'aria-label': 'Fach' });
+  function markieren() {
+    for (const b of klassenKnoepfe) {
+      b.classList.toggle('primaer', b.dataset.id === klasseId);
+      b.setAttribute('aria-pressed', String(b.dataset.id === klasseId));
+    }
+    for (const b of fachLeiste.querySelectorAll('[data-id]')) {
+      b.classList.toggle('gewaehlt', b.dataset.id === (fachId ?? ''));
+      b.setAttribute('aria-pressed', String(b.dataset.id === (fachId ?? '')));
+    }
+  }
+
+  const klassenWahl = (liste) => el('div', { class: 'klassen-wahl', role: 'group', 'aria-label': 'Klasse' }, liste.map((k) => {
+    const b = el('button', {
+      type: 'button', class: 'knopf', dataset: { id: k.id },
+      onclick: () => {
+        klasseId = k.id;
+        const vorschlag = fachVorschlag(k, alle, faecher);
+        if (vorschlag) fachId = vorschlag;
+        markieren();
+      },
+    }, k.name);
+    klassenKnoepfe.push(b);
+    return b;
+  }));
+
+  function faecherZeigen() {
+    fachLeiste.replaceChildren(
+      ...faecher.map((f) => el('button', {
+        type: 'button', class: 'knopf fach-wahl', dataset: { id: f.id }, style: { '--fachfarbe': f.farbe },
+        onclick: () => { fachId = f.id; markieren(); },
+      }, fachEtikett(f, 'kurz'), el('span', { text: f.name }))),
+      el('button', { type: 'button', class: 'knopf fach-wahl', dataset: { id: '' }, onclick: () => { fachId = null; markieren(); } }, 'ohne Fach'),
+      el('button', {
+        type: 'button', class: 'knopf leise',
+        onclick: async () => {
+          const neu = await fachDialog(null);
+          if (!neu) return;
+          faecher.push(neu);
+          fachId = neu.id;
+          faecherZeigen();
+        },
+      }, icon('plus'), 'Neues Fach'),
+    );
+    markieren();
+  }
+
+  const inhalt = [
+    el('p', { class: 'hinweis', text: `${zeit.von}–${zeit.bis}` + (state.schulen.length > 1 ? ` · ${schule.name}` : '') }),
+    el('h3', { text: 'Klasse' }),
+    eigene.length ? klassenWahl(eigene) : null,
+    ohne.length ? el('p', { class: 'hinweis', text: eigene.length
+      ? `Noch ohne Schule (gehört danach zu „${schule.name}“):`
+      : `Diese Klassen haben noch keine Schule. Wählst du eine, gehört sie danach zu „${schule.name}“.` }) : null,
+    ohne.length ? klassenWahl(ohne) : null,
+    !eigene.length && !ohne.length
+      ? el('p', { text: `Zu „${schule.name}“ gehört noch keine Klasse. Ordne sie unter „Schulen“ zu.` }) : null,
+    el('h3', { text: 'Fach' }),
+    fachLeiste,
+  ];
+  faecherZeigen();
 
   const ergebnis = await zeigeDialog({
     titel: `${TAGE[tag - 1].name}, ${nr}. Stunde`,
-    inhalt: [
-      el('p', { class: 'hinweis', text: `${zeit.von}–${zeit.bis}` + (state.schulen.length > 1 ? ` · ${schule.name}` : '') }),
-      eigene.length ? wahl(eigene) : null,
-      ohne.length ? el('h3', { text: eigene.length ? 'Noch ohne Schule' : 'Klassen' }) : null,
-      ohne.length ? wahl(ohne) : null,
-      ohne.length ? el('p', { class: 'hinweis', text: `Wählst du eine Klasse ohne Schule, gehört sie danach zu „${schule.name}“.` }) : null,
-      !eigene.length && !ohne.length
-        ? el('p', { text: `Zu „${schule.name}“ gehört noch keine Klasse. Ordne sie unter „Schulen“ zu.` }) : null,
-    ],
-    knoepfe: [{ text: 'Abbrechen' }, eintrag ? { text: 'Stunde leeren', wert: 'leeren', gefahr: true } : null].filter(Boolean),
+    inhalt,
+    knoepfe: [
+      eintrag ? { text: 'Stunde leeren', wert: 'leeren', gefahr: true } : null,
+      { text: 'Abbrechen' },
+      { text: 'Speichern', wert: 'ok', primaer: true },
+    ].filter(Boolean),
   });
-  if (!ergebnis) return;
+  if (ergebnis === 'leeren') {
+    await db.setzeStunde({ schuleId: schule.id, tag, stunde: nr, klasseId: null });
+    app.neuZeichnen();
+    return;
+  }
+  if (ergebnis !== 'ok') return;
+  const klasse = state.klassen.find((k) => k.id === klasseId);
+  if (!klasse) { toast('Keine Klasse gewählt – nichts eingetragen.'); return; }
 
-  const klasse = state.klassen.find((k) => k.id === ergebnis);
-  if (ergebnis !== 'leeren' && !klasse) return;
-  await db.setzeStunde({ schuleId: schule.id, tag, stunde: nr, klasseId: klasse?.id ?? null });
-  if (klasse && !klasse.schuleId) {
+  await db.setzeStunde({ schuleId: schule.id, tag, stunde: nr, klasseId: klasse.id, fachId });
+  if (!klasse.schuleId) {
     klasse.schuleId = schule.id;
     await db.speichereKlasse(klasse);
     toast(`„${klasse.name}“ gehört jetzt zu „${schule.name}“.`);
   }
   app.neuZeichnen();
+}
+
+// Welches Fach passt zu dieser Klasse? Das, das sie im Stundenplan am häufigsten hat –
+// sonst das Fach, das unter "Angaben zur Klasse" steht. Kein Treffer: undefined.
+function fachVorschlag(klasse, eintraege, faecher) {
+  const zaehler = new Map();
+  for (const e of eintraege) {
+    if (e.klasseId === klasse.id && faecher.some((f) => f.id === e.fachId)) zaehler.set(e.fachId, (zaehler.get(e.fachId) || 0) + 1);
+  }
+  if (zaehler.size) return [...zaehler].sort((a, b) => b[1] - a[1])[0][0];
+  const name = (klasse.fach || '').trim().toLowerCase();
+  return name ? faecher.find((f) => f.name.toLowerCase() === name || f.kurz.toLowerCase() === name)?.id : undefined;
+}
+
+// ============================ Fächer =======================================
+
+// "Informatik" -> "INF", "GWB" -> "GWB", "Bewegung und Sport" -> "BuS"
+function kuerzel(name) {
+  const woerter = name.trim().split(/\s+/).filter(Boolean);
+  if (woerter.length > 1) return woerter.map((w) => w[0]).join('').slice(0, 4);
+  const wort = woerter[0] || '';
+  return (wort.length <= 4 ? wort : wort.slice(0, 3)).toUpperCase();
+}
+
+// Dialog: Fach anlegen (fach = null) oder bearbeiten.
+// Rückgabe: das gespeicherte Fach, true nach dem Löschen, null bei Abbrechen.
+async function fachDialog(fach) {
+  const faecher = await db.ladeFaecher();
+  const name = el('input', { required: true, maxlength: 30, value: fach?.name || '', placeholder: 'z. B. Informatik' });
+  const kurz = el('input', { required: true, maxlength: 5, value: fach?.kurz || '', placeholder: 'INF' });
+  // Das Kürzel entsteht beim Tippen des Namens – bis man es selbst ändert
+  let kurzSelbst = !!fach;
+  name.addEventListener('input', () => { if (!kurzSelbst) kurz.value = kuerzel(name.value); });
+  kurz.addEventListener('input', () => { kurzSelbst = true; });
+  let farbe = fach?.farbe || freieFarbe(faecher.map((f) => f.farbe));
+
+  const ergebnis = await zeigeDialog({
+    titel: fach ? 'Fach bearbeiten' : 'Neues Fach',
+    inhalt: [
+      el('div', { class: 'feld-reihe fach-felder' }, feld('Name', name), feld('Kürzel', kurz)),
+      farbFeld(farbe, (f) => { farbe = f; }),
+    ],
+    knoepfe: [
+      fach ? { text: 'Löschen', wert: 'loeschen', gefahr: true } : null,
+      { text: 'Abbrechen' },
+      { text: fach ? 'Speichern' : 'Anlegen', wert: 'ok', primaer: true },
+    ].filter(Boolean),
+  });
+
+  if (ergebnis === 'loeschen') {
+    if (!await bestaetigen({
+      titel: `„${fach.name}“ löschen?`,
+      text: 'Die Stunden bleiben im Stundenplan, nur ohne Fach.',
+      knopf: 'Löschen', gefahr: true,
+    })) return null;
+    await db.loescheFach(fach.id);
+    toast('Fach gelöscht.');
+    return true;
+  }
+  if (ergebnis !== 'ok') return null;
+  const gespeichert = await db.speichereFach({
+    ...fach, name: name.value.trim(), kurz: kurz.value.trim() || kuerzel(name.value), farbe,
+  });
+  if (!fach) toast(`„${gespeichert.name}“ angelegt.`);
+  return gespeichert;
 }
 
 // ============================ Eine Schule ==================================
@@ -452,7 +630,7 @@ function klassenHaken(schuleId, beiAenderung = null) {
 // Farbauswahl (runde Farbknöpfe). beiWahl(farbe) meldet die gewählte Farbe.
 // Ein <div> statt <label>: Ein Klick auf eine Beschriftung würde den ersten Knopf auslösen.
 function farbFeld(aktuell, beiWahl) {
-  const knoepfe = SCHULFARBEN.map((f) => el('button', {
+  const knoepfe = FARBEN.map((f) => el('button', {
     type: 'button',
     class: 'farbe' + (f.hell ? ' hell' : '') + (f.wert === aktuell ? ' aktiv' : ''),
     style: { background: f.wert },
@@ -474,7 +652,7 @@ function farbFeld(aktuell, beiWahl) {
 export async function neueSchuleDialog() {
   const name = el('input', { required: true, maxlength: 40, placeholder: 'z. B. BG Musterstadt' });
   // Vorschlag: die erste Farbe, die noch keine Schule hat
-  let farbe = (SCHULFARBEN.find((f) => !state.schulen.some((s) => s.farbe === f.wert)) || SCHULFARBEN[0]).wert;
+  let farbe = freieFarbe(state.schulen.map((s) => s.farbe));
   const klassen = klassenHaken(null);
 
   const ergebnis = await zeigeDialog({
@@ -507,14 +685,17 @@ export async function neueSchuleDialog() {
 // in der Pause "Pause · 4. Stunde ab 10:45 · in 4 Min". Sonst steht nur "Fach · Raum" da.
 // zusatz (z. B. "2 abwesend") steht immer dabei; ort (Fach · Raum) fällt neben der
 // Stunde am Handy weg, weil der Platz nicht reicht.
-export function stundeInfo(schule, ort, zusatz = '') {
+// faecher: Map Stunde -> Fach dieser Klasse heute (siehe faecherHeute): Statt der Uhr
+// steht dann das Kürzel des Fachs vorne ("INF 3. Stunde …").
+export function stundeInfo(schule, ort, zusatz = '', faecher = new Map()) {
   return mitlaufend(el('span', { class: 'stunde-info' }), (e) => {
     const lage = schule ? stundeJetzt(schule.stunden) : null;
     e.classList.toggle('laeuft', !!lage);
     if (!lage) { e.replaceChildren([ort, zusatz].filter(Boolean).join(' · ')); return; }
     const stunde = lage.art === 'stunde';
+    const fach = faecher.get(lage.nr);
     e.replaceChildren(
-      el('span', { class: 'stunde-zeit' }, icon('uhr'),
+      el('span', { class: 'stunde-zeit' }, fach ? fachEtikett(fach, 'kurz') : icon('uhr'),
         stunde ? `${lage.nr}. Stunde ${lage.von}–${lage.bis}`
           : `${lage.art === 'pause' ? 'Pause · ' : ''}${lage.nr}. Stunde ab ${lage.von}`),
       el('strong', { text: stunde ? `noch ${lage.rest} Min` : `in ${lage.rest} Min` }),
@@ -523,6 +704,15 @@ export function stundeInfo(schule, ort, zusatz = '') {
       stunde ? el('span', { class: 'stunde-balken', style: { '--anteil': lage.anteil } }) : null,
     );
   });
+}
+
+// Die Fächer einer Klasse heute laut Stundenplan: Map Stunde (1, 2 …) -> Fach
+export function faecherHeute(klasse, eintraege, faecher, jetzt = new Date()) {
+  const tag = wochentag(jetzt);
+  const nachId = new Map(faecher.map((f) => [f.id, f]));
+  return new Map(eintraege
+    .filter((e) => e.klasseId === klasse.id && e.schuleId === klasse.schuleId && e.tag === tag && nachId.has(e.fachId))
+    .map((e) => [e.stunde, nachId.get(e.fachId)]));
 }
 
 // Welche Klasse ist laut Stundenplan jetzt dran? Die laufende Stunde – oder in der
