@@ -15,7 +15,7 @@ import { zeichneUebersicht } from './views/uebersicht.js';
 import { zeichnePerson } from './views/person.js';
 import { zeichneVersionen } from './views/versionen.js';
 import { zeichneStundenplan, klasseJetzt } from './views/stundenplan.js';
-import { sperren, automatischSperren } from './views/sperre.js';
+import { sperren, automatischSperren, jetztSperren } from './views/sperre.js';
 import { backupErinnerung, erinnerungVerschieben } from './util/sicherung.js';
 import * as autobackup from './util/autobackup.js';
 
@@ -118,6 +118,13 @@ function zeichneKopf() {
 
   kopf.replaceChildren(el('div', { class: 'kopf-zeile' },
     leiste,
+    // Immer sichtbar: App sofort sperren (z. B. wenn man kurz aufsteht)
+    el('button', {
+      class: 'sperr-knopf',
+      title: 'App sperren – entsperren nur mit der PIN',
+      'aria-label': 'App sperren',
+      onclick: async () => { await jetztSperren(); neuZeichnen(); },
+    }, icon('schloss'), el('span', { text: 'Sperren' })),
     el('span', { class: 'version', title: 'Version der App', text: appVersion }),
   ));
 

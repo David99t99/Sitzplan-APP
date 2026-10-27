@@ -141,8 +141,31 @@ h3 {
   padding-top: env(safe-area-inset-top);
   z-index: 10;
 }
-/* Erste Zeile im Kopf: links die Klassen-Tabs, rechts die Versionsanzeige */
+/* Erste Zeile im Kopf: links die Klassen-Tabs, rechts "Sperren" und die Versionsanzeige */
 .kopf-zeile { display: flex; align-items: center; }
+/* Knopf "Sperren": immer sichtbar. Am Handy nur das Schloss (Platz für die Tabs) */
+.sperr-knopf {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--rand-stark);
+  border-radius: 22px;
+  background: var(--flaeche);
+  font-weight: 600;
+  font-size: .88rem;
+  transition: background .15s, transform .08s;
+}
+.sperr-knopf .icon { width: 18px; height: 18px; color: var(--akzent); }
+.sperr-knopf:active { transform: scale(.95); }
+@media (hover: hover) { .sperr-knopf:hover { background: var(--akzent-hell); border-color: var(--akzent); } }
+@media (max-width: 600px) {
+  .sperr-knopf { width: 44px; padding: 0; }
+  .sperr-knopf span { display: none; }
+}
 /* Versionsanzeige rechts oben (z. B. "v3") */
 .version {
   flex: none;

@@ -7,7 +7,7 @@
 // aus PIN + Zufallswert ("Salt").
 
 import * as db from '../db.js';
-import { el, toast, bestaetigen, feld, kartenKopf } from '../util/ui.js';
+import { el, toast, zeigeDialog, bestaetigen, feld, kartenKopf } from '../util/ui.js';
 import { icon } from '../util/icons.js';
 
 // ----------------------------------------------------------------- Hash
@@ -115,6 +115,33 @@ export async function sperren() {
   });
 }
 
+// Der Knopf "Sperren" oben rechts (immer sichtbar): sperrt sofort, z. B. wenn man kurz
+// aufsteht. Gibt es noch keine PIN, wird zuerst eine festgelegt.
+export async function jetztSperren() {
+  if (await pinLaden()) return sperren();
+  const [a, b] = pinFelder();
+  const ergebnis = await zeigeDialog({
+    titel: 'Erst eine PIN festlegen',
+    inhalt: [
+      el('p', { class: 'hinweis', text: 'Zum Sperren braucht die App eine PIN aus 4 bis 8 Ziffern. Mit ihr entsperrst du die App wieder. Merk sie dir gut – vergessen lässt sie sich nur durch Löschen aller Daten.' }),
+      feld('Neue PIN (4–8 Ziffern)', a),
+      feld('PIN wiederholen', b),
+    ],
+    knoepfe: [{ text: 'Abbrechen' }, { text: 'Festlegen und sperren', wert: 'ok', primaer: true }],
+  });
+  if (ergebnis !== 'ok') return;
+  if (a.value !== b.value) return toast('Die beiden Eingaben stimmen nicht überein.');
+  await pinSetzen(a.value);
+  toast('PIN gespeichert.');
+  await sperren();
+}
+
+// Zwei Felder für eine neue PIN (Eingabe + Wiederholung). Der Browser prüft "4–8 Ziffern" selbst.
+function pinFelder() {
+  const opt = { type: 'password', inputmode: 'numeric', pattern: '[0-9]{4,8}', maxlength: 8, autocomplete: 'off', required: true };
+  return [el('input', opt), el('input', opt)];
+}
+
 // PIN vergessen: Es gibt keine Hintertür. Nur alles löschen hilft (danach Backup einspielen).
 async function pinVergessen() {
   if (!await bestaetigen({
@@ -151,10 +178,6 @@ export async function pinKarte(neuZeichnen) {
   const gespeichert = await pinLaden();
   const karte = el('div', { class: 'karte' }, kartenKopf('schloss', 'PIN-Sperre'));
 
-  const pinFelder = () => {
-    const opt = { type: 'password', inputmode: 'numeric', pattern: '[0-9]{4,8}', maxlength: 8, autocomplete: 'off', required: true };
-    return [el('input', opt), el('input', opt)];
-  };
   const neuForm = (knopfText) => {
     const [a, b] = pinFelder();
     return el('form', {
@@ -173,7 +196,7 @@ export async function pinKarte(neuZeichnen) {
 
   if (!gespeichert) {
     karte.append(
-      el('p', { class: 'hinweis', text: 'Optional. Beim Öffnen der App wird eine PIN abgefragt. Das ist ein Sichtschutz – den eigentlichen Schutz bietet die Sperre deines Geräts.' }),
+      el('p', { class: 'hinweis', text: 'Optional. Beim Öffnen der App wird eine PIN abgefragt, und der Knopf „Sperren“ oben rechts sperrt die App sofort (z. B. wenn du kurz aufstehst). Das ist ein Sichtschutz – den eigentlichen Schutz bietet die Sperre deines Geräts.' }),
       neuForm('PIN aktivieren'),
     );
     return karte;

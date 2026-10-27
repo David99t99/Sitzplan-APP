@@ -16,6 +16,7 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
   Mitarbeit hat jetzt drei Knöpfe: + / ✓ / − (✓ = passt, nichts Auffälliges; zählt nicht in die Summe, steht aber als eigene Spalte in Übersicht und CSV). Im Schnellmenü löscht „Diese Stunde löschen“ alle Einträge der Person seit Beginn der laufenden Stunde (mit „Rückgängig“).
 - v12: Automatisches Backup am Laptop: Die App speichert jede Woche (oder jeden Tag) von selbst ein Backup in einen Ordner, den man einmal auswählt (siehe „Datensicherung“).
 - v13: Neues App-Symbol (abgerundete Kachel mit Tafel und Sitzplätzen, eigene Varianten für iPhone und Android, Symbol im Browser-Tab). „Mehr“ → „Automatisches Backup“ zeigt, wann das nächste Backup fällig ist und ob der Zugriff auf den Ordner erlaubt ist.
+- v14: Knopf „Sperren“ oben rechts, immer sichtbar: sperrt die App sofort (PIN-Eingabe zum Entsperren).
 
 ## Projektstruktur
 
@@ -178,13 +179,14 @@ am Laptop am besten automatisch:
 ## PIN-Sperre
 
 „Mehr“ → „PIN-Sperre“. Die PIN wird beim Öffnen abgefragt und nach einer einstellbaren Zeit im
-Hintergrund erneut. Sie ist ein Sichtschutz, keine Verschlüsselung. **PIN vergessen** = nur alle Daten
+Hintergrund erneut. Der Knopf **„Sperren“ oben rechts** (immer sichtbar) sperrt die App sofort, z. B. wenn du
+kurz aufstehst; gibt es noch keine PIN, fragt er zuerst danach. Die PIN ist ein Sichtschutz, keine Verschlüsselung. **PIN vergessen** = nur alle Daten
 auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor du eine PIN setzt.
 
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v13';` erhöhen (v14, v15 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v14';` erhöhen (v15, v16 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.
