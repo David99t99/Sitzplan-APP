@@ -15,12 +15,14 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
 - v11: Eigenes Layout für den Laptop (ab 1000 px Fensterbreite): Navigation links statt unten, Kopf des Sitzplans in einer Zeile, „Ohne Platz“ und die Bearbeiten-Aktionen rechts neben dem Raster. Der Sitzplan passt so ohne Scrollen auf den Bildschirm und die Plätze werden größer. Am Handy bleibt alles wie bisher.
   Mitarbeit hat jetzt drei Knöpfe: + / ✓ / − (✓ = passt, nichts Auffälliges; zählt nicht in die Summe, steht aber als eigene Spalte in Übersicht und CSV). Im Schnellmenü löscht „Diese Stunde löschen“ alle Einträge der Person seit Beginn der laufenden Stunde (mit „Rückgängig“).
 - v12: Automatisches Backup am Laptop: Die App speichert jede Woche (oder jeden Tag) von selbst ein Backup in einen Ordner, den man einmal auswählt (siehe „Datensicherung“).
+- v13: Neues App-Symbol (abgerundete Kachel mit Tafel und Sitzplätzen, eigene Varianten für iPhone und Android, Symbol im Browser-Tab). „Mehr“ → „Automatisches Backup“ zeigt, wann das nächste Backup fällig ist und ob der Zugriff auf den Ordner erlaubt ist.
 
 ## Projektstruktur
 
 ```
 index.html              Grundgerüst der Seite
-manifest.webmanifest    App-Name, Icons (für "Zum Home-Bildschirm")
+manifest.webmanifest    App-Name, Icons (für "Zum Home-Bildschirm" bzw. "App installieren")
+icons/                  App-Symbole; icons/symbole-erzeugen.py zeichnet sie neu (Python + Pillow)
 sw.js                   Service Worker: macht die App offline-fähig
 css/app.css             Aussehen (Farben oben als Variablen)
 lib/dexie.mjs           Dexie 4 (IndexedDB-Bibliothek), lokal statt CDN
@@ -182,7 +184,7 @@ auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v12';` erhöhen (v13, v14 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v13';` erhöhen (v14, v15 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.

@@ -5,7 +5,7 @@
 //
 // WICHTIG: Nach jeder Code-Änderung VERSION erhöhen (z. B. v2, v3 …).
 // Sonst lädt das Handy weiterhin die alte, gecachte Version.
-const VERSION = 'sitzplan-v12';
+const VERSION = 'sitzplan-v13';
 
 // Alle Dateien, die offline verfügbar sein müssen.
 // Neue Datei angelegt? -> hier eintragen!
@@ -41,6 +41,8 @@ const DATEIEN = [
   './icons/apple-touch-icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './icons/icon-maskable-512.png',
+  './icons/favicon-32.png',
 ];
 
 // 1) Installation: alle Dateien in einen neuen Cache laden

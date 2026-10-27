@@ -126,6 +126,9 @@ async function sicherungKarte() {
   );
 }
 
+// "Montag, 2. November"
+const tagFormat = new Intl.DateTimeFormat('de-AT', { weekday: 'long', day: 'numeric', month: 'long' });
+
 // Automatisches Backup in einen Ordner (nur Edge/Chrome am Computer, siehe util/autobackup.js)
 async function autoBackupKarte() {
   const kopf = kartenKopf('sicherung', 'Automatisches Backup');
@@ -139,6 +142,8 @@ async function autoBackupKarte() {
     db.ladeEinstellung('letztesAutoBackup'),
     db.ladeEinstellung('autoBackupTage', 7),
   ]);
+  const naechstes = autobackup.naechstesAb(letztes, tage);
+  const zugriff = ordner ? await ordner.queryPermission({ mode: 'readwrite' }) : null;
 
   async function waehlen() {
     if (!await autobackup.ordnerWaehlen()) return;
@@ -160,14 +165,37 @@ async function autoBackupKarte() {
     onchange: async (e) => {
       await db.speichereEinstellung('autoBackupTage', Number(e.target.value));
       toast('Gespeichert.');
+      app.neuZeichnen(); // "Nächstes" neu berechnen
     },
   }, [[1, 'jeden Tag (beim ersten Öffnen)'], [7, 'jede Woche']].map(([w, t]) => el('option', { value: w, text: t })));
   intervall.value = String(tage);
 
   return el('div', { class: 'karte' }, kopf,
     el('p', { class: 'status gut' }, icon('haken'), `Ein: Ordner „${ordner.name}“`),
-    el('p', { class: 'hinweis', text: (letztes ? `Zuletzt automatisch gesichert: ${datumText(letztes)}. ` : '')
-      + 'Die letzten 10 automatischen Backups bleiben im Ordner, ältere werden gelöscht. Fragt der Browser nach dem Zugriff, „Bei jedem Besuch zulassen“ wählen – dann läuft es ohne Nachfrage.' }),
+    // Wann zuletzt, wann als Nächstes – damit man sieht, dass es von selbst weiterläuft
+    el('ul', { class: 'backup-termine' },
+      el('li', {}, el('span', { text: 'Zuletzt' }), el('strong', { text: letztes ? datumText(letztes) : 'noch nie' })),
+      el('li', {}, el('span', { text: 'Nächstes' }), el('strong', {
+        text: naechstes && naechstes > new Date()
+          ? `ab ${tagFormat.format(naechstes)}, beim ersten Öffnen der App`
+          : 'beim nächsten Öffnen der App',
+      })),
+    ),
+    // Zugriff auf den Ordner: Nach einem Neustart von Browser/Laptop zeigt sich, ob er
+    // dauerhaft erlaubt ist ("Bei jedem Besuch zulassen") oder neu bestätigt werden muss
+    zugriff === 'granted'
+      ? el('p', { class: 'status gut' }, icon('haken'), 'Zugriff auf den Ordner ist erlaubt')
+      : el('div', { class: 'leiste' },
+        el('p', { class: 'status warnung wachsen', text: 'Der Zugriff auf den Ordner muss einmal bestätigt werden.' }),
+        el('button', {
+          class: 'knopf klein primaer',
+          onclick: async () => {
+            await ordner.requestPermission({ mode: 'readwrite' });
+            app.neuZeichnen();
+          },
+        }, 'Zugriff erlauben'),
+      ),
+    el('p', { class: 'hinweis', text: 'Fragt der Browser nach dem Zugriff, „Bei jedem Besuch zulassen“ wählen. Steht hier auch nach einem Neustart des Laptops „erlaubt“, läuft alles ohne Nachfrage. Die letzten 10 automatischen Backups bleiben im Ordner, ältere werden gelöscht.' }),
     feld('Automatisch sichern', intervall),
     el('div', { class: 'leiste fuellen' },
       el('button', {

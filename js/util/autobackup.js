@@ -17,7 +17,6 @@ import { backupInhalt, backupDateiname } from './sicherung.js';
 
 const AUFBEWAHREN = 10;
 const ENDUNG = '-automatisch.json';
-const TAG = 24 * 60 * 60 * 1000;
 
 // Geht das in diesem Browser? (nicht am iPhone, nicht in Firefox/Safari)
 export const moeglich = () => 'showDirectoryPicker' in window;
@@ -43,15 +42,19 @@ export async function ausschalten() {
   await db.speichereEinstellung('autoBackupOrdner', null);
 }
 
-// Fällig, wenn seit dem letzten automatischen Backup so viele Kalendertage vergangen sind
-// (wöchentlich: Montag gesichert -> nächsten Montag wieder, egal zu welcher Uhrzeit)
+// Ab wann ist das nächste automatische Backup fällig? Nach so vielen Kalendertagen,
+// egal zu welcher Uhrzeit (wöchentlich: Montag gesichert -> ab nächstem Montag wieder).
+// Rückgabe: Date (Mitternacht) oder null = sofort (noch nie gesichert)
+export function naechstesAb(letztes, tage) {
+  if (!letztes) return null;
+  const d = new Date(letztes);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + tage);
+}
+
 export async function faellig() {
   if (!moeglich() || !await ladeOrdner()) return false;
-  const tage = await db.ladeEinstellung('autoBackupTage', 7);
-  const letztes = await db.ladeEinstellung('letztesAutoBackup');
-  if (!letztes) return true;
-  const mitternacht = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  return Math.round((mitternacht(new Date()) - mitternacht(new Date(letztes))) / TAG) >= tage;
+  const ab = naechstesAb(await db.ladeEinstellung('letztesAutoBackup'), await db.ladeEinstellung('autoBackupTage', 7));
+  return !ab || Date.now() >= ab.getTime();
 }
 
 // Schreibt ein Backup in den Ordner.

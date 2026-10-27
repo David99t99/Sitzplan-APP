@@ -1161,6 +1161,10 @@ select {
 .status { display: flex; align-items: center; gap: 8px; margin: 0; font-size: .9rem; font-weight: 600; }
 .status.gut { color: var(--positiv); }
 .status.warnung { color: var(--text); }
+/* Automatisches Backup: "Zuletzt …" / "Nächstes …" als kleine Tabelle */
+.backup-termine { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: .9rem; }
+.backup-termine li { display: contents; }
+.backup-termine span { color: var(--leise); }
 
 /* Versionen */
 .version-details { padding: 4px 12px 14px; display: flex; flex-direction: column; gap: 10px; }
