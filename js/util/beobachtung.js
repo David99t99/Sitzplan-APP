@@ -8,6 +8,7 @@ export const KATEGORIEN = {
   verhalten: 'Verhalten',
   abwesend: 'Abwesend',
   notiz: 'Notiz',
+  leistung: 'Leistungskontrolle',
 };
 
 // Abwesenheit: ein Eintrag mit kategorie 'abwesend' und wert 0 (zählt nicht als plus/minus).
@@ -22,6 +23,29 @@ export function istAbwesend(eintraege = []) {
 // ✓ zählt nicht in die Summe, wird aber mitgezählt (summen(): "neutral").
 export const istPasst = (b) => b.kategorie === 'mitarbeit' && b.wert === 0;
 
+// Leistungskontrolle (Test, Arbeitsauftrag, Heftkontrolle …): ein Eintrag pro bewerteter Person mit
+// kategorie 'leistung', wert 0 (zählt nicht als plus/minus) und dazu lkId, art, titel und bewertung (Text).
+// Alle Einträge einer Kontrolle haben dieselbe lkId und denselben Zeitpunkt (siehe db.js).
+export const LEISTUNG = 'leistung';
+
+// Vorschläge für die Art (frei tippen geht trotzdem)
+export const LK_ARTEN = ['Test', 'Schularbeit', 'Arbeitsauftrag', 'Heftkontrolle', 'Hausübung', 'Referat',
+  'Mündliche Wiederholung', 'Projekt'];
+
+// Fasst die Einträge zu Leistungskontrollen zusammen, älteste zuerst:
+// [{ id, art, titel, zeitpunkt, ergebnisse: Map personId -> Eintrag }]
+export function leistungskontrollen(beobachtungen) {
+  const nachId = new Map();
+  for (const b of beobachtungen) {
+    if (b.kategorie !== LEISTUNG) continue;
+    if (!nachId.has(b.lkId)) {
+      nachId.set(b.lkId, { id: b.lkId, art: b.art, titel: b.titel, zeitpunkt: b.zeitpunkt, ergebnisse: new Map() });
+    }
+    nachId.get(b.lkId).ergebnisse.set(b.personId, b);
+  }
+  return [...nachId.values()].sort((a, b) => a.zeitpunkt.localeCompare(b.zeitpunkt) || a.art.localeCompare(b.art, 'de'));
+}
+
 // Lesbarer Name einer Kategorie (auch für Schnellbuttons)
 export function kategorieName(kategorie, schnellbuttons) {
   if (KATEGORIEN[kategorie]) return KATEGORIEN[kategorie];
@@ -29,7 +53,7 @@ export function kategorieName(kategorie, schnellbuttons) {
   return sb ? sb.name : kategorie;
 }
 
-// Alle Kategorien für Filter und Tabellen: Mitarbeit, Verhalten, Schnellbuttons, Abwesend, Notiz
+// Alle Kategorien für Filter und Tabellen: Mitarbeit, Verhalten, Schnellbuttons, Abwesend, Notiz, Leistungskontrolle
 export function alleKategorien(schnellbuttons, mitGeloeschten = false) {
   return [
     { id: 'mitarbeit', name: 'Mitarbeit' },
@@ -39,6 +63,7 @@ export function alleKategorien(schnellbuttons, mitGeloeschten = false) {
       .map((s) => ({ id: 'sb-' + s.id, name: s.name })),
     { id: ABWESEND, name: 'Abwesend' },
     { id: 'notiz', name: 'Notiz' },
+    { id: LEISTUNG, name: 'Leistungskontrolle' },
   ];
 }
 
@@ -149,9 +174,28 @@ export function uhrzeitText(iso) {
   return zeitFormat.format(new Date(iso));
 }
 
+// "12.10." (Spaltenköpfe), mit Jahr "12.10.2026"
+const kurzFormat = new Intl.DateTimeFormat('de-AT', { day: '2-digit', month: '2-digit' });
+const kurzMitJahrFormat = new Intl.DateTimeFormat('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+export function datumKurz(iso, mitJahr = false) {
+  return (mitJahr ? kurzMitJahrFormat : kurzFormat).format(new Date(iso));
+}
+
 // Für <input type="datetime-local">: "2026-10-08T09:35" in ORTSZEIT
 export function fuerEingabe(iso) {
   const d = new Date(iso);
   const z = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;
+}
+
+// Für <input type="date">: "2026-10-08" in ORTSZEIT
+export function fuerDatum(iso) {
+  return fuerEingabe(iso).slice(0, 10);
+}
+
+// Zeitpunkt zu einem gewählten Datum ("2026-10-08"): heute = jetzt, sonst 12 Uhr an diesem Tag
+export function zeitpunktAm(tag, jetzt = new Date()) {
+  if (tag === fuerDatum(jetzt.toISOString())) return jetzt.toISOString();
+  const [j, m, t] = tag.split('-').map(Number);
+  return new Date(j, m - 1, t, 12).toISOString();
 }

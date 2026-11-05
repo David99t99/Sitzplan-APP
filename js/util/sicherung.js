@@ -2,7 +2,7 @@
 
 import * as db from '../db.js';
 import { dateiAusgeben } from './datei.js';
-import { kategorieName } from './beobachtung.js';
+import { kategorieName, LEISTUNG } from './beobachtung.js';
 
 const FORMAT = 'sitzplan-backup';
 // 1 = bis App v6 (Raster im Sitzplan, Raumvorlagen), 2 = ab v7 (eigenständige Räume),
@@ -112,8 +112,12 @@ export async function csvEintraege(klasse, beobachtungen, personen, schnellbutto
     const p = nachId.get(b.personId);
     if (!p) continue;
     const d = new Date(b.zeitpunkt);
+    // Leistungskontrolle: "Leistungskontrolle: Test", Wertung = die Bewertung, Notiz = die Bezeichnung
+    const lk = b.kategorie === LEISTUNG;
     zeilen.push([datum.format(d), zeit.format(d), p.nachname, p.vorname,
-      kategorieName(b.kategorie, schnellbuttons), b.wert, b.text]);
+      lk ? `${kategorieName(LEISTUNG, [])}: ${b.art}` : kategorieName(b.kategorie, schnellbuttons),
+      lk ? b.bewertung : b.wert,
+      lk ? [b.titel, b.text].filter(Boolean).join(' – ') : b.text]);
   }
   return dateiAusgeben(dateiname(klasse, 'Beobachtungen'), csv(zeilen), 'text/csv');
 }

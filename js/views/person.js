@@ -7,9 +7,10 @@ import { el, toast, zeigeDialog, feld, avatar, vollerName } from '../util/ui.js'
 import { icon } from '../util/icons.js';
 import {
   ZEITRAEUME, zeitraumGrenzen, imZeitraum, summen, alleKategorien, kategorieName,
-  wertZeichen, summeText, tagText, uhrzeitText, fuerEingabe, ABWESEND,
+  wertZeichen, summeText, tagText, uhrzeitText, fuerEingabe, ABWESEND, LEISTUNG,
 } from '../util/beobachtung.js';
 import { wertKlasse } from './schnellmenue.js';
+import { leistungDialog } from './leistung.js';
 
 export async function zeichnePerson(container) {
   const person = await db.ladePerson(state.personId);
@@ -68,6 +69,7 @@ export async function zeichnePerson(container) {
       .map((sb) => kachel(sb.name, anzahl('sb-' + sb.id), 'sb-' + sb.id)),
     kachel('Abwesend', anzahl(ABWESEND), ABWESEND),
     kachel('Notizen', anzahl('notiz'), 'notiz'),
+    kachel('Leistungskontrollen', anzahl(LEISTUNG), LEISTUNG),
   ));
 
   // ---------- Liste, nach Tagen gruppiert ----------
@@ -94,6 +96,26 @@ export async function zeichnePerson(container) {
     if (t !== letzterTag) {
       liste.append(el('li', { class: 'tag-kopf', text: t }));
       letzterTag = t;
+    }
+    // Leistungskontrolle: Art und Bezeichnung, rechts die Bewertung statt der Uhrzeit.
+    // Antippen öffnet die ganze Kontrolle (Art und Datum gelten für die Klasse).
+    if (b.kategorie === LEISTUNG) {
+      liste.append(el('li', {},
+        el('button', {
+          class: 'zeile eintrag',
+          onclick: async () => {
+            if (await leistungDialog({ klasseId: person.klasseId, lkId: b.lkId, fokus: person.id })) app.neuZeichnen();
+          },
+        },
+          el('span', { class: 'eintrag-zeichen lk' }, icon('liste')),
+          el('span', { class: 'zeile-text' },
+            el('strong', { text: b.art }),
+            el('small', { text: b.titel ? `Leistungskontrolle · ${b.titel}` : 'Leistungskontrolle' }),
+          ),
+          el('span', { class: 'lk-bewertung', text: b.bewertung }),
+        ),
+      ));
+      continue;
     }
     liste.append(el('li', {},
       el('button', {
@@ -140,8 +162,10 @@ export function filterLeiste({ mitKategorie = false, kategorien = [] } = {}) {
 // ---------------------------------------------------------------------------
 // Dialog: Eintrag bearbeiten oder nachtragen. Rückgabe: true, wenn etwas geändert wurde.
 // ---------------------------------------------------------------------------
+// (Leistungskontrollen haben einen eigenen Dialog, siehe leistung.js)
 async function eintragDialog(b, schnellbuttons, istNeu) {
   const kategorien = alleKategorien(schnellbuttons, true)
+    .filter((k) => k.id !== LEISTUNG)
     .filter((k) => !k.id.startsWith('sb-') || k.id === b.kategorie
       || !schnellbuttons.find((s) => 'sb-' + s.id === k.id)?.geloescht);
 

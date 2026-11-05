@@ -23,7 +23,7 @@ import {
   platzieren, freigeben, aufraeumen, zufaelligVerteilen,
 } from '../util/raster.js';
 import { ziehbarMachen, warGeradeGezogen } from '../util/ziehen.js';
-import { zeitraumGrenzen, istAbwesend, istPasst, ABWESEND } from '../util/beobachtung.js';
+import { zeitraumGrenzen, istAbwesend, istPasst, ABWESEND, LEISTUNG } from '../util/beobachtung.js';
 import { oeffneSchnellmenue } from './schnellmenue.js';
 import { versionSpeichernDialog } from './versionen.js';
 import { stundeInfo, faecherHeute } from './stundenplan.js';
@@ -45,7 +45,7 @@ export async function zeichnePlan(container) {
   // plan = wer sitzt wo (gehört der Klasse), raum = wo die Plätze sind (gilt für alle Klassen im Raum)
   // schule = Stundenzeiten für "3. Stunde · noch 12 Min" (oder null),
   // stundenplan + faecher = welches Fach diese Klasse heute in welcher Stunde hat
-  const [plan, raum, personen, heuteAlle, schule, stundenplan, faecher] = await Promise.all([
+  const [plan, raum, personen, heuteGeladen, schule, stundenplan, faecher] = await Promise.all([
     db.ladeAktuellenPlan(klasse.id),
     db.ladeRaum(klasse.raumId),
     db.ladePersonen(klasse.id),
@@ -54,7 +54,9 @@ export async function zeichnePlan(container) {
     db.ladeStundenplan(),
     db.ladeFaecher(),
   ]);
-  // Heutige Einträge nach Person sortiert: Map personId -> [Einträge]
+  // Heutige Einträge nach Person sortiert: Map personId -> [Einträge].
+  // Leistungskontrollen gehören nicht dazu (keine Zähler am Platz, nicht in "Diese Stunde löschen").
+  const heuteAlle = heuteGeladen.filter((b) => b.kategorie !== LEISTUNG);
   const heute = new Map();
   for (const b of heuteAlle) {
     if (!heute.has(b.personId)) heute.set(b.personId, []);

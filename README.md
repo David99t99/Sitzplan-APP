@@ -17,6 +17,8 @@ Alle Daten bleiben **nur auf dem Gerät** (IndexedDB). Kein Server, keine Cloud,
 - v12: Automatisches Backup am Laptop: Die App speichert jede Woche (oder jeden Tag) von selbst ein Backup in einen Ordner, den man einmal auswählt (siehe „Datensicherung“).
 - v13: Neues App-Symbol (abgerundete Kachel mit Tafel und Sitzplätzen, eigene Varianten für iPhone und Android, Symbol im Browser-Tab). „Mehr“ → „Automatisches Backup“ zeigt, wann das nächste Backup fällig ist und ob der Zugriff auf den Ordner erlaubt ist.
 - v14: Knopf „Sperren“ oben rechts, immer sichtbar: sperrt die App sofort (PIN-Eingabe zum Entsperren).
+- v15: Leistungskontrollen (Test, Arbeitsauftrag, Heftkontrolle …) in der Übersicht, siehe „Leistungskontrollen“ unten.
+  Dazu: Am Handy scrollt in der Übersicht nur noch die Tabelle seitlich (die Namen bleiben stehen), nicht mehr die ganze Seite.
 
 ## Projektstruktur
 
@@ -48,6 +50,7 @@ js/views/klasse.js      Ansicht "Mehr": Klasse, Datensicherung, PIN, Schnellbutt
 js/views/schnellmenue.js  Schnellmenü im Unterrichtsmodus
 js/views/person.js      Verlauf einer Person (+ Filterleiste, Eintrag-Dialog)
 js/views/uebersicht.js  Klassenübersicht (Tabelle) + CSV-Export
+js/views/leistung.js    Dialog "Leistungskontrolle eintragen/bearbeiten"
 js/views/versionen.js   Frühere Sitzordnungen
 js/views/sperre.js      PIN-Sperre (Sperrbildschirm, Einstellungen)
 ```
@@ -148,6 +151,24 @@ Wer an mehreren Schulen unterrichtet, legt unter „Stundenplan“ für jede Sch
   (auch nach mehr als 5 Minuten im Hintergrund). Ein Hinweis unten bietet „Zurück zu …“ an.
 - Schule löschen löscht nur ihre Stundenzeiten und ihren Stundenplan, nicht die Klassen.
 
+## Leistungskontrollen
+
+In der „Übersicht“ oben rechts „Leistungskontrolle eintragen“ wählen:
+
+- **Art** (z. B. Test, Arbeitsauftrag, Heftkontrolle – Vorschläge erscheinen, frei tippen geht auch),
+  optional eine **Bezeichnung** (z. B. „Bruchrechnung“) und das **Datum**.
+- Darunter stehen alle SuS der Klasse. Bei jeder Person die **Bewertung** eintragen, frei wie auf Papier:
+  `2`, `+`, `~`, `18/24`, `nicht abgegeben` … Leer lassen = nicht bewertet (z. B. gefehlt).
+  **Enter** springt zur nächsten Person, so geht eine ganze Klasse schnell mit der Tastatur.
+- In der Übersicht bekommt jede Leistungskontrolle eine eigene Spalte unter „Leistungskontrollen“
+  (Art und Datum im Kopf, die älteste links). Es erscheinen die Kontrollen im gewählten Zeitraum.
+- **Bewertung antippen** öffnet die Kontrolle wieder, mit dem Feld dieser Person ausgewählt – zum Ändern,
+  Nachtragen (Nachtest) oder „Löschen“ (mit „Rückgängig“). Spaltenkopf antippen sortiert nach der Bewertung
+  (1, 2, 3 …; wer keine hat, steht unten).
+- Im **Verlauf** einer Person stehen die Leistungskontrollen mit der Bewertung rechts.
+  Im Sitzplan erscheinen sie nicht (keine Zähler am Platz).
+- Leistungskontrollen sind im Backup und in beiden CSV-Dateien enthalten.
+
 ## Datensicherung und Übertragung
 
 **Wo liegen die Daten?** In einer Datenbank des Browsers (IndexedDB), nicht im Cache. „Cache leeren“
@@ -186,7 +207,7 @@ auf dem Gerät löschen und ein Backup einspielen. Deshalb: Backup machen, bevor
 ## Updates einspielen
 
 1. Code ändern.
-2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v14';` erhöhen (v15, v16 …).
+2. In `sw.js` die Zeile `const VERSION = 'sitzplan-v15';` erhöhen (v16, v17 …).
    Diese Nummer wird in der App oben rechts angezeigt – so siehst du, ob das Update angekommen ist.
    Neue Dateien zusätzlich in die Liste `DATEIEN` eintragen.
 3. Hochladen / pushen.

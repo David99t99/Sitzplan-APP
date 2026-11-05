@@ -48,9 +48,10 @@ export function toast(text, { knopf = null, aktion = null, dauer = 2500 } = {}) 
 //     inhalt: [eingabefeld1, eingabefeld2],
 //     knoepfe: [{ text: 'Abbrechen' }, { text: 'Speichern', wert: 'ok', primaer: true }],
 //   });
-export function zeigeDialog({ titel, inhalt = [], knoepfe = [{ text: 'OK', wert: 'ok', primaer: true }] }) {
+// breit: true = breiteres Fenster am Laptop (z. B. eine Liste aller SuS)
+export function zeigeDialog({ titel, inhalt = [], knoepfe = [{ text: 'OK', wert: 'ok', primaer: true }], breit = false }) {
   return new Promise((resolve) => {
-    const dialog = el('dialog', { class: 'dialog' });
+    const dialog = el('dialog', { class: 'dialog' + (breit ? ' breit' : '') });
     // method="dialog": ein Absende-Knopf schließt den Dialog und setzt returnValue
     const form = el('form', { method: 'dialog' },
       el('h2', { text: titel }),

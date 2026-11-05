@@ -6,6 +6,7 @@
 
 import Dexie from '../lib/dexie.mjs';
 import { ohneSitzplatz } from './util/raster.js';
+import { LEISTUNG } from './util/beobachtung.js';
 
 export const db = new Dexie('sitzplan');
 
@@ -23,6 +24,7 @@ export const db = new Dexie('sitzplan');
 //               das Raster des Raums, wie es beim Speichern war.
 // Person      { id, klasseId, vorname, nachname, foto (JPEG als Data-URL), notiz, farbe, archiviert }
 // Beobachtung { id, personId, klasseId, zeitpunkt, kategorie, wert, text }   (ab Phase 2)
+//               Leistungskontrollen zusätzlich: lkId, art, titel, bewertung   (ab v15)
 // Einstellung { schluessel, wert }
 // Schule      { id, name, farbe ("#eab308"), stunden: [{ von: "07:50", bis: "08:40" }, …] }   (ab v9)
 // Stunde      { id, schuleId, tag (1 = Mo … 5 = Fr), stunde (1 = erste Stunde), klasseId,
@@ -354,8 +356,9 @@ export async function loeschePerson(person) {
 // ============================ Beobachtungen ================================
 //
 // Eine Beobachtung hängt an der PERSON (nicht am Platz) und übersteht daher jedes Umsetzen.
-//   kategorie: 'mitarbeit' | 'verhalten' | 'notiz' | 'abwesend' | 'sb-<id>' (Schnellbutton, z. B. 'sb-hue')
-//   wert:      +1, -1 oder 0 (Notizen, Abwesenheit)
+//   kategorie: 'mitarbeit' | 'verhalten' | 'notiz' | 'abwesend' | 'leistung' (Leistungskontrolle, siehe unten)
+//              | 'sb-<id>' (Schnellbutton, z. B. 'sb-hue')
+//   wert:      +1, -1 oder 0 (Notizen, Abwesenheit, Leistungskontrollen)
 //   zeitpunkt: ISO-Zeitstempel, z. B. "2026-10-08T07:45:12.000Z" (lässt sich als Text sortieren)
 //   text:      optionale Notiz
 
@@ -398,6 +401,49 @@ export async function ladeBeobachtungenPerson(personId) {
 
 export async function ladePerson(id) {
   return db.personen.get(id);
+}
+
+// ============================ Leistungskontrollen ==========================
+//
+// Eine Leistungskontrolle (Test, Arbeitsauftrag, Heftkontrolle …) gilt für die ganze Klasse.
+// Gespeichert wird sie als eine Beobachtung pro bewerteter Person, alle mit derselben lkId:
+//   { …, kategorie: 'leistung', wert: 0, lkId, art: 'Test', titel: 'Bruchrechnung', bewertung: '2' }
+// So steht sie wie alles andere im Verlauf, im Backup und im CSV.
+
+export async function ladeLeistungskontrolle(klasseId, lkId) {
+  return db.beobachtungen.where('klasseId').equals(klasseId).filter((b) => b.lkId === lkId).toArray();
+}
+
+// Speichert eine Leistungskontrolle. bewertungen: Map personId -> Text ('' = nicht bewertet).
+// Bestehende Einträge werden geändert, geleerte gelöscht. Einträge von Personen, die nicht in
+// bewertungen stehen (archiviert), bekommen nur die neue Art, Bezeichnung und das neue Datum.
+export async function speichereLeistungskontrolle({ lkId, klasseId, art, titel, zeitpunkt }, bewertungen) {
+  await db.transaction('rw', db.beobachtungen, async () => {
+    const vorher = await ladeLeistungskontrolle(klasseId, lkId);
+    const alt = new Map(vorher.map((b) => [b.personId, b]));
+    const gemeinsam = { klasseId, kategorie: LEISTUNG, wert: 0, lkId, art, titel, zeitpunkt };
+    for (const [personId, bewertung] of bewertungen) {
+      const b = alt.get(personId);
+      if (bewertung) await db.beobachtungen.put({ text: '', ...b, ...gemeinsam, id: b?.id ?? neueId(), personId, bewertung });
+      else if (b) await db.beobachtungen.delete(b.id);
+    }
+    for (const b of vorher) {
+      if (!bewertungen.has(b.personId)) await db.beobachtungen.put({ ...b, ...gemeinsam });
+    }
+  });
+}
+
+// Löscht eine Leistungskontrolle. Rückgabe: die gelöschten Einträge (für "Rückgängig")
+export async function loescheLeistungskontrolle(klasseId, lkId) {
+  const liste = await ladeLeistungskontrolle(klasseId, lkId);
+  await db.beobachtungen.bulkDelete(liste.map((b) => b.id));
+  return liste;
+}
+
+// Alle bisher verwendeten Arten, alphabetisch (Vorschläge beim Eintragen)
+export async function ladeLeistungsArten() {
+  const liste = await db.beobachtungen.filter((b) => b.kategorie === LEISTUNG).toArray();
+  return [...new Set(liste.map((b) => b.art))].sort((a, b) => a.localeCompare(b, 'de'));
 }
 
 // ============================ Schnellbuttons ===============================

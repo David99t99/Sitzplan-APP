@@ -1,14 +1,16 @@
-// uebersicht.js – Klassenübersicht: eine Zeile pro Person mit den Summen je Kategorie.
+// uebersicht.js – Klassenübersicht: eine Zeile pro Person mit den Summen je Kategorie,
+// rechts dazu eine Spalte pro Leistungskontrolle (Test, Heftkontrolle …) mit der Bewertung.
 // Hilfreich für die Leistungsbeurteilung. Spaltenköpfe antippen = sortieren,
-// Zeile antippen = Verlauf der Person.
+// Zeile antippen = Verlauf der Person, Bewertung antippen = Leistungskontrolle bearbeiten.
 
 import { state, app, aktuelleKlasse } from '../state.js';
 import * as db from '../db.js';
 import { el, tipp, avatar } from '../util/ui.js';
 import { icon } from '../util/icons.js';
-import { zeitraumGrenzen, summen, summeText, ZEITRAEUME } from '../util/beobachtung.js';
+import { zeitraumGrenzen, summen, summeText, ZEITRAEUME, leistungskontrollen, datumKurz } from '../util/beobachtung.js';
 import { csvEintraege, csvUebersicht } from '../util/sicherung.js';
 import { filterLeiste } from './person.js';
+import { leistungDialog } from './leistung.js';
 
 export async function zeichneUebersicht(container) {
   const klasse = aktuelleKlasse();
@@ -31,6 +33,8 @@ export async function zeichneUebersicht(container) {
   // Gelöschte Schnellbuttons nur zeigen, wenn es im Zeitraum Einträge dazu gibt
   const vorhanden = new Set(beobachtungen.map((b) => b.kategorie));
   const buttons = alleButtons.filter((s) => !s.geloescht || vorhanden.has('sb-' + s.id));
+  // Leistungskontrollen im Zeitraum, älteste zuerst (= links)
+  const lks = leistungskontrollen(beobachtungen);
 
   // ---------- Werte pro Person berechnen ----------
   const nachPerson = new Map(personen.map((p) => [p.id, []]));
@@ -48,31 +52,40 @@ export async function zeichneUebersicht(container) {
     for (const sb of buttons) w['sb-' + sb.id] = s['sb-' + sb.id]?.anzahl || 0;
     w.abwesend = s.abwesend?.anzahl || 0;
     w.notiz = s.notiz?.anzahl || 0;
+    for (const lk of lks) w['lk-' + lk.id] = lk.ergebnisse.get(p.id)?.bewertung || '';
     return { person: p, w };
   });
 
   // ---------- Sortieren ----------
   const { spalte, absteigend } = state.sortierung;
+  const istLk = spalte.startsWith('lk-');
   zeilen.sort((a, b) => {
     const x = a.w[spalte], y = b.w[spalte];
-    const v = typeof x === 'string' ? x.localeCompare(y, 'de') : x - y;
+    // Leistungskontrolle: Wer (noch) keine Bewertung hat, steht immer unten
+    if (istLk && !x !== !y) return x ? -1 : 1;
+    const v = typeof x === 'string' ? x.localeCompare(y, 'de', { numeric: true }) : x - y;
     return (absteigend ? -v : v) || a.w.name.localeCompare(b.w.name, 'de');
   });
 
   // ---------- Tabelle ----------
   // Spaltenkopf, der beim Antippen sortiert
-  const kopf = (id, text, extra = {}) => el('th', {
+  const kopf = (id, text, { klasse = '', ...extra } = {}) => el('th', {
     ...extra,
-    class: 'sortierbar' + (spalte === id ? ' sortiert' : ''),
+    class: 'sortierbar' + (spalte === id ? ' sortiert' : '') + (klasse ? ' ' + klasse : ''),
     'aria-sort': spalte === id ? (absteigend ? 'descending' : 'ascending') : null,
     onclick: () => {
-      // Zahlen zuerst absteigend (die meisten oben), Namen aufsteigend
+      // Zahlen zuerst absteigend (die meisten oben), Namen und Bewertungen aufsteigend (1, 2, 3 …)
       state.sortierung = spalte === id
         ? { spalte: id, absteigend: !absteigend }
-        : { spalte: id, absteigend: id !== 'name' };
+        : { spalte: id, absteigend: id !== 'name' && !id.startsWith('lk-') };
       app.neuZeichnen();
     },
   }, text, spalte === id ? (absteigend ? ' ▾' : ' ▴') : '');
+
+  // Kopf einer Leistungskontrolle: Art und Datum (Bezeichnung als Tooltip)
+  const lkKopf = (lk, i) => kopf('lk-' + lk.id,
+    [el('span', { class: 'lk-art', text: lk.art }), el('small', { text: datumKurz(lk.zeitpunkt) })],
+    { klasse: 'lk-kopf' + (i === 0 ? ' lk-start' : ''), title: `${lkName(lk)} (${datumKurz(lk.zeitpunkt, true)})` });
 
   const thead = el('thead', {},
     el('tr', {},
@@ -82,11 +95,13 @@ export async function zeichneUebersicht(container) {
       buttons.map((sb) => kopf('sb-' + sb.id, sb.name, { rowspan: 2 })),
       kopf('abwesend', 'Abwesend', { rowspan: 2 }),
       kopf('notiz', 'Notizen', { rowspan: 2 }),
+      lks.length ? el('th', { colspan: lks.length, class: 'gruppe lk-start', text: 'Leistungskontrollen' }) : null,
     ),
     el('tr', {},
       kopf('mitarbeit-plus', '+'), kopf('mitarbeit-passt', '✓', { title: 'passt, nichts Auffälliges' }),
       kopf('mitarbeit-minus', '−'), kopf('mitarbeit-summe', 'Σ'),
       kopf('verhalten-plus', '+'), kopf('verhalten-minus', '−'), kopf('verhalten-summe', 'Σ'),
+      lks.map(lkKopf),
     ),
   );
   // Die Name-Spalte braucht beide Klassen (sortierbar + fixiert)
@@ -95,6 +110,15 @@ export async function zeichneUebersicht(container) {
   const zahl = (n, art = '') => el('td', { class: 'zahl ' + art + (n === 0 ? ' null' : '') }, String(n));
   const summeZelle = (n) => el('td', { class: 'zahl summe ' + (n > 0 ? 'positiv' : n < 0 ? 'negativ' : 'null') },
     summeText(n));
+  // Bewertung einer Leistungskontrolle (leer = nicht bewertet): antippen = Kontrolle bearbeiten statt Verlauf
+  const lkZelle = (lk, i, person, text) => el('td', {
+    class: 'lk' + (i === 0 ? ' lk-start' : ''),
+    title: `${lkName(lk)}: ${text || 'nicht bewertet'}\nAntippen = Bewertung ändern`,
+    onclick: async (e) => {
+      e.stopPropagation();
+      if (await leistungDialog({ klasseId: klasse.id, lkId: lk.id, fokus: person.id })) app.neuZeichnen();
+    },
+  }, text);
 
   const tbody = el('tbody', {}, zeilen.map(({ person, w }) => el('tr', {
     tabindex: 0,
@@ -109,24 +133,36 @@ export async function zeichneUebersicht(container) {
     buttons.map((sb) => zahl(w['sb-' + sb.id])),
     zahl(w.abwesend),
     zahl(w.notiz),
+    lks.map((lk, i) => lkZelle(lk, i, person, w['lk-' + lk.id])),
   )));
 
   container.append(
-    el('p', { class: 'unterzeile', text: `${beobachtungen.length} Einträge · ${personen.length} SuS` }),
+    el('div', { class: 'leiste uebersicht-kopf' },
+      el('p', { class: 'unterzeile', text: `${beobachtungen.length} Einträge · ${personen.length} SuS` }),
+      el('button', {
+        class: 'knopf klein primaer',
+        onclick: async () => { if (await leistungDialog({ klasseId: klasse.id })) app.neuZeichnen(); },
+      }, icon('plus'), 'Leistungskontrolle eintragen'),
+    ),
     el('div', { class: 'tabelle-huelle', dataset: { scroll: 'uebersicht' } },
       el('table', { class: 'tabelle' }, thead, tbody)),
-    el('p', { class: 'hinweis', text: 'Spaltenkopf antippen = sortieren · Zeile antippen = Verlauf' }),
+    el('p', {
+      class: 'hinweis',
+      text: 'Spaltenkopf antippen = sortieren · Zeile antippen = Verlauf'
+        + (lks.length ? ' · Bewertung antippen = ändern' : ''),
+    }),
     el('div', { class: 'leiste fuellen' },
       el('button', {
         class: 'knopf klein',
         onclick: () => csvUebersicht(klasse,
           ['Nachname', 'Vorname', 'Mitarbeit +', 'Mitarbeit ✓', 'Mitarbeit −', 'Mitarbeit Summe',
             'Verhalten +', 'Verhalten −', 'Verhalten Summe', ...buttons.map((sb) => sb.name), 'Abwesend', 'Notizen',
-            'Zeitraum'],
+            ...lks.map((lk) => `${lkName(lk)} (${datumKurz(lk.zeitpunkt, true)})`), 'Zeitraum'],
           zeilen.map(({ person, w }) => [person.nachname, person.vorname,
             w['mitarbeit-plus'], w['mitarbeit-passt'], w['mitarbeit-minus'], w['mitarbeit-summe'],
             w['verhalten-plus'], w['verhalten-minus'], w['verhalten-summe'],
-            ...buttons.map((sb) => w['sb-' + sb.id]), w.abwesend, w.notiz, zeitraumName()])),
+            ...buttons.map((sb) => w['sb-' + sb.id]), w.abwesend, w.notiz,
+            ...lks.map((lk) => w['lk-' + lk.id]), zeitraumName()])),
       }, icon('herunter'), 'Übersicht als CSV'),
       el('button', {
         class: 'knopf klein',
@@ -142,6 +178,11 @@ function zeitraumName() {
   if (f.zeitraum !== 'eigen') return ZEITRAEUME.find((z) => z.id === f.zeitraum)?.name || '';
   const de = (t) => (t ? t.split('-').reverse().join('.') : '…');
   return `${de(f.von)} – ${de(f.bis)}`;
+}
+
+// "Test – Bruchrechnung" bzw. nur "Test"
+function lkName(lk) {
+  return lk.titel ? `${lk.art} – ${lk.titel}` : lk.art;
 }
 
 function oeffnePerson(id) {
